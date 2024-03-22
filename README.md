@@ -20,28 +20,21 @@ sudo apt install python3-devel
 
 # install ffmpeg with H.265 installed
 
-You need to add the rpmfusion repos:
+You need to add the rpmfusion repos and update ffmpeg:
 
-sudo dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm && sudo dnf groupupdate multimedia --setop="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin --allowerasing && sudo dnf groupupdate sound-and-video
+sudo dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+sudo dnf groupupdate multimedia --setop="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin --allowerasing
+sudo dnf groupupdate sound-and-video
 
-## First install VMAF
 
-git clone https://github.com/Netflix/vmaf.git
-cd vmaf
-make
-sudo make install
+# Tutorials:
+* https://www.toptal.com/computer-vision/computer-vision-pipeline
 
-## Now install x265
+Pipelines:
 
-git clone https://bitbucket.org/multicoreware/x265_git
-cd x265_git/build/linux
-./make-Makefiles.bash
-make
-sudo make install
+* https://viso.ai/computer-vision/mediapipe/
+* https://github.com/pipeless-ai/pipeless
 
-cd ~
-git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
-cd ffmpeg
-./configure --enable-gpl --enable-libx265
-make
-sudo make install
+# Commercial Options
+https://www.eyesonit.us/
+- Comptuer vision pipeline. $25 per stream/month
