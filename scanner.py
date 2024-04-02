@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
-Find new photos
+Find new photos test program.
+Finds them and archives photos significantly different from previous ones with a window.os +/-
 """
 
 import cv2
 import os
 import os.path
 import subprocess
+import yaml
 
-THRESHOLD=0.96
+THRESHOLD=0.92
 
 from similarity.sim1 import img_sim
 
@@ -17,6 +19,7 @@ class Scanner:
         self.current = None
         self.sim_threshold = THRESHOLD
         self.skipped = 0
+        cv2.namedWindow("scanner")
 
     def ingest(self, fname):
         img = cv2.imread(fname)
@@ -30,7 +33,8 @@ class Scanner:
             self.skipped += 1
         else:
             print(f"score={score} skipped={self.skipped}\t{fname}")
-            subprocess.call(['open',fname])
+            cv2.imshow("scanner",img)
+            cv2.waitKey(1)
             self.current = img
             self.skipped = 0
 
@@ -46,7 +50,7 @@ def process_root(root):
 
 if __name__=="__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Scan a directory",
+    parser = argparse.ArgumentParser(description="Scan and a directory",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument("root", help='Directory to process')

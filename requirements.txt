@@ -1,3 +1,4 @@
 opencv-python
 scikit-image
 imutils
+pyyaml

@@ -166,3 +166,5 @@ frames*/
 activate
 config.json
 *.out
+etc/dynamodb-local
+config.yml

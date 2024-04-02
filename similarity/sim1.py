@@ -12,6 +12,20 @@ import argparse
 import imutils
 import cv2
 
+class SimilarityScore():
+    def __init__(self, score, diff):
+        self.score = score
+        self.diff = diff
+
+    def __float__(self):
+        return self.score
+
+    def __lt__(self, v):
+        return self.score.__lt__( v )
+
+    def __gt__(self, v):
+        return self.score.__gt__( v )
+
 def img_sim(imageA, imageB):
     # convert the images to grayscale
     grayA = cv2.cvtColor(imageA, cv2.COLOR_BGR2GRAY)
@@ -21,7 +35,7 @@ def img_sim(imageA, imageB):
     # images, ensuring that the difference image is returned
     (score, diff) = compare_ssim(grayA, grayB, full=True)
     diff = (diff * 255).astype("uint8")
-    return (score, diff)
+    return SimilarityScore(score, diff)
 
 
 def show(imageA, imageB, diff):
