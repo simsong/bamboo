@@ -48,6 +48,9 @@ clean:
 eslint:
 	(cd static;make eslint)
 
+debug:
+	$(PYTHON) flask --app flask_app run --debug
+
 
 ################################################################
 # Installations are used by the CI pipeline:

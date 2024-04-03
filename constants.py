@@ -1,6 +1,6 @@
 """Constants"""
 
-# pylint: ignore=too-few-public-methods
+# pylint: disable=too-few-public-methods
 class C:
     """Constants"""
     DEFAULT_SIM_THRESHOLD = 0.95

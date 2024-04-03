@@ -3,12 +3,8 @@ Single handy place for paths.
 """
 
 import os
-from os.path import dirname, abspath, relpath, join
-import functools
+from os.path import dirname, abspath, join
 import shutil
-
-import bottle
-from bottle import jinja2_view
 
 HOME = os.getenv('HOME')
 if HOME is None:
@@ -32,14 +28,8 @@ PRODUCTION_CONFIG_FNAME = join( ROOT_DIR, 'etc', 'credentials.ini')
 AWS_LAMBDA_LINUX_STATIC_FFMPEG       = join(ETC_DIR, 'ffmpeg-6.1-amd64-static')
 AWS_LAMBDA_ENVIRON = 'AWS_LAMBDA'
 
-# used by test program:
-BOTTLE_APP_PATH = join(ROOT_DIR, 'bottle_app.py')
-
 # Add the relative template path (since jinja2 doesn't like absolute paths)
-bottle.TEMPLATE_PATH.append(relpath(TEMPLATE_DIR))
 
-# Create the @view decorator to add template to the function output
-view = functools.partial(jinja2_view)
 
 def running_in_aws_lambda():
     return AWS_LAMBDA_ENVIRON in os.environ

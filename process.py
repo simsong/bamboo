@@ -1,29 +1,70 @@
+"""
+process frames that have been ingested.
+"""
 
 import os
 import os.path
-import subprocess
-import json
-from datetime import datetime
-import queue
-from multiprocessing import Pool
-import functools
-import uuid
-import urllib.parse
-import shutil
-import mimetypes
-from os.path import basename,dirname,join
+from abc import ABC,abstractmethod
 
-import boto3
-import yaml
 import cv2
-from lib.ctools.timer import Timer
-from similarity.sim1 import img_sim
-from constants import C
 from ingest import Frame
 
+class Stage(ABC):
+    """Abstract base class for processing DAG"""
+    def __init__(self):
+        self.inputs = set()
+        self.outputs = set()
 
-class Stage
+    def add_input(self, obj):
+        self.inputs.add(obj)
 
+    def add_output(self,obj):
+        self.outputs.add(obj)
+
+    @abstractmethod
+    def process(self, frame:Frame):
+        """Called to process"""
+
+    @abstractmethod
+    def done(self):
+        """Called when done processing."""
+
+class OpenCVFaceDetector(Stage):
+    """OpenCV Face Detector using Harr cascades."""
+    @staticmethod
+    def cv2_cascade(name):
+        """Return a harr cascade from OpenCV installation."""
+        thedir = os.path.join(os.path.dirname(cv2.__file__), "data")
+        path = os.path.join( thedir, name)
+        if not os.path.exists(path) or name is None:
+            raise ValueError("Cascade name '"+name+"' must be one of "+" ".join(list(sorted(os.listdir(thedir)))))
+        return path
+
+    frontal_face_cascade = cv2.CascadeClassifier( cv2_cascade('haarcascade_frontalface_default.xml'))
+    profile_cascade = cv2.CascadeClassifier( cv2_cascade('haarcascade_profileface.xml'))
+
+    def process(self, frame:Frame):
+        front_faces = self.frontal_face_cascade.detectMultiScale(frame.img_grayscale,
+                                                                 scaleFactor=1.1,
+                                                                 minNeighbors=10,
+                                                                 minSize=(40,40),
+                                                                 flags=cv2.CASCADE_SCALE_IMAGE)
+
+        profile_faces = self.profile_cascade.detectMultiScale(frame.img_grayscale, scaleFactor=1.1, minNeighbors=10,
+                                                              minSize=(40,40),
+                                                              flags=cv2.CASCADE_SCALE_IMAGE)
+        if len(front_faces):
+            print(frame.path,"front faces:",front_faces)
+        if len(profile_faces):
+            print(frame.path,"profile faces:",profile_faces)
+
+    def done(self):
+        """This is terminal."""
+
+def run_root(pipeline, root):
+    for frame in Frame.FrameStream(root):
+        print(frame)
+        pipeline.process(frame)
 
 if __name__=="__main__":
     import argparse
@@ -32,7 +73,10 @@ if __name__=="__main__":
 
     parser.add_argument("roots", nargs="*", help='Directories to process. By default, process the config file')
     args = parser.parse_args()
+
+    # Create a simple pipline - run a face recognizer and print the results
+    pipeline = OpenCVFaceDetector()
+
     if args.roots:
         for root in args.roots:
-            for frame in Frame.FrameStream(root):
-                print(frame)
+            run_root(pipeline, root)

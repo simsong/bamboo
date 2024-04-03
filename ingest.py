@@ -7,26 +7,26 @@ Finds them and archives photos significantly different from previous ones with a
 
 import os
 import os.path
-import subprocess
 import json
 from datetime import datetime
-import queue
-from multiprocessing import Pool
 import functools
-import uuid
 import urllib.parse
 import shutil
 import mimetypes
-from os.path import basename,dirname,join
+from os.path import dirname
 
 import boto3
 import yaml
 import cv2
 from lib.ctools.timer import Timer
-from similarity.sim1 import img_sim
 from constants import C
+from frame import Frame,FrameArray
 
-THRESHOLD=0.92
+# We use the cache to avoid making the same directory twice
+@functools.lru_cache(maxsize=128)
+def mkdirs(path):
+    print("mkdirs",path)
+    os.makedirs(path, exist_ok = True)
 
 def file_generator(root):
     """Generator for a series of images from a root"""
@@ -38,117 +38,24 @@ def file_generator(root):
 def yaml_items(item):
     if not isinstance(item,list):
         item = [item]
-    for i in item:
-        yield i
+    yield from item
 
 def filename_template(*,camera,path=None,mtime=None):
     """Returns the path"""
     if path and not mtime:
         mtime = datetime.fromtimestamp( os.stat(path).st_mtime )
 
-    fmt =  f"{camera}/{mtime.year:04}-{mtime.month:02}/{mtime.year:04}{mtime.month:02}{mtime.day:02}-{mtime.hour:02}{mtime.minute}{mtime.second:02}"
+    fmt =  f"{camera}/{mtime.year:04}-{mtime.month:02}/{mtime.year:04}{mtime.month:02}{mtime.day:02}-{mtime.hour:02}{mtime.minute:02}{mtime.second:02}"
     if mtime.microsecond>0:
         fmt += f"{mtime.microsecond:06}"
     fmt += os.path.splitext(path)[1]
     return fmt
-
-def similarity_for_two(t):
-    """Similarity of two CV2 images on a scale of 0 to 1.0.
-    This form is used to allow for multiprocessing, since we cannot send . """
-    return (t[0],t[1],img_sim(t[2],t[3]).score)
 
 
 def s3_client():
     return boto3.session.Session().client( 's3' )
 def s3_resource():
     return boto3.Session().resource( 's3' )
-
-# We use the cache to avoid making the same directory twice
-@functools.lru_cache(maxsize=128)
-def mkdirs(path):
-    print("mkdirs",path)
-    os.makedirs(path, exist_ok = True)
-
-@functools.lru_cache(maxsize=128)
-def image_read(path):
-    """Caching image read"""
-    return cv2.imread(path)
-
-class Frame():
-    """Abstraction to hold an image frame."""
-    def __init__(self, *, path=None):
-        self.path = path
-        self.tags = {}
-        self.prev = None        # previous image
-        # Read the timestamp from the filename if present, otherwise gram from mtime
-        try:
-            self.mtime = datetime.fromisoformat( os.path.splitext(os.path.basename(path))[0] )
-        except ValueError:
-            self.mtime = datetime.fromtimestamp(os.path.getmtime(path))
-
-    def __lt__(self, b):
-        return  self.mtime < b.mtime
-    def __repr__(self):
-        return f"<Frame {os.path.basename(self.path)}>"
-
-    @classmethod
-    def FrameStream(cls, source):
-        """Generator for a series of Frame() objects."""
-        if os.path.isdir(source):
-            for (dirpath, dirnames, filenames) in os.walk(source): # pylint: disable=unused-variable
-                for fname in sorted(filenames):
-                    if os.path.splitext(fname)[1].lower() in C.IMAGE_EXTENSIONS:
-                        path = os.path.join(dirpath, fname)
-                        if os.path.getsize(path)>0:
-                            yield Frame(path=path)
-        else:
-            yield Frame(path=source)
-
-
-
-
-    @property
-    def img(self):
-        """return an opencv image object"""
-        return image_read(self.path)
-
-    @functools.lru_cache(maxsize=10)
-    def similarity(self, i2):
-        """Return the simularity score with img"""
-        if i2 is None:
-            return 0            # not similar at all
-        return img_sim(self.img, i2.img)
-
-class FrameArray(list):
-    """Array of frames"""
-    def __init__(self, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
-        self.sorted = False
-
-    def add(self, item):
-        self.append(item)
-        self.sorted = False
-
-    def sort(self):
-        if not self.sorted:
-            super().sort()
-            self.sorted=True
-
-    def firstn(self, n):
-        self.sort()
-        return self[0:n]
-
-    def lastn(self, n):
-        self.sort()
-        return sorted(self[-n:], reverse=True)
-
-    def first(self):
-        return self.firstn(1)[0]
-
-    def set_prev_pointers(self):
-        self.sort()
-        for n in range(1,len(self)):
-            self[n].prev = self[n-1]
 
 class IngestCamera():
     """Master class for camera ingester"""
@@ -157,7 +64,7 @@ class IngestCamera():
         self.root   = config['archive']['root']
         self.config = config['cameras'][camera]
         self.show   = show
-        self.sim_threshold = C.DEFAULT_SIM_THRESHOLD
+        self.sim_threshold = self.config['threshold']
         self.total_kept = 0
 
     def notice(self, msg, endl=False):
@@ -206,7 +113,6 @@ class IngestCamera():
         # Get the first and retain
         ref = ary.first()
         self.ingest_save_image(ref)
-        prev = ref
         skipped = 0
 
         # This could be a pipeline or parallelized? Would be nice to know fps
@@ -217,7 +123,7 @@ class IngestCamera():
                 self.notice(i.path)
                 try:
                     score = i.similarity(ref)
-                except cv2.error as e:
+                except cv2.error as e: # pylint: disable=catching-non-exception
                     print(f"Error {e} with {i.path}")
                     continue
                 if score > self.sim_threshold:
@@ -227,7 +133,6 @@ class IngestCamera():
                     self.ingest_save_image(i)
                     # self.ingest_save_image(prev) # also save the previous one
                     ref = i
-                prev = i
             print("fps: ",len(ary) / t.elapsed(),end=' ')
 
         print(f"Total kept: {self.total_kept} / {len(ary)} = {self.total_kept * 100//len(ary)}%")
