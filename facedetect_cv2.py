@@ -31,5 +31,4 @@ class OpenCVFaceDetector(Stage):
         if len(profile_faces):
             print(frame.path,"profile faces:",profile_faces)
 
-    def done(self):
-        """This is terminal."""
+        self.done(frame)

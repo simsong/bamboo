@@ -25,7 +25,8 @@ if __name__=="__main__":
 
     # Create a simple pipline - run a face recognizer and print the results
     yfd = Yolo8FaceDetect()
-    yfd.add_output( ShowTags())
+    yfd.add_output( ocd := OpenCVFaceDetector())
+    ocd.add_output( ShowTags())
 
     if args.roots:
         for root in args.roots:
