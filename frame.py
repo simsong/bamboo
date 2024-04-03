@@ -30,7 +30,7 @@ class Frame():
     """Abstraction to hold an image frame."""
     def __init__(self, *, path=None):
         self.path = path
-        self.tags = {}
+        self.tags = []
         self.prev = None        # previous image
         self.copy = None        # for annotation
         # Read the timestamp from the filename if present, otherwise gram from mtime
@@ -44,13 +44,21 @@ class Frame():
     def __repr__(self):
         return f"<Frame {os.path.basename(self.path)}>"
 
-    def annotate( self, pt1, pt2, text, *, textcolor=C.GREEN, boxcolor=C.RED, thickness=2):
+    def annotate( self, i, pt1, pt2, text, *, textcolor=C.GREEN, boxcolor=C.RED, thickness=2):
         (x,y) = pt1
+        cv2.rectangle(i, pt1, pt2, boxcolor, thickness=thickness)
+        cv2.putText(i, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.8, textcolor, thickness=thickness)
 
-        if self.copy is None:
-            self.copy = self.img.copy()
-        cv2.rectangle(self.copy, pt1, pt2, boxcolor, thickness=thickness)
-        cv2.putText(self.copy, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.8, textcolor, thickness=thickness)
+
+    def show_tags(self):
+        i = self.img.copy()
+        winName = self.path
+        for tag in self.tags:
+            if tag['type']=='face':
+                self.annotate( i, tag['pt1'], tag['pt2'], text=f'fqa_score: {tag["fqa_score"]:4.2f}')
+        cv2.namedWindow(winName, 0)
+        cv2.imshow(winName, i)
+        cv2.waitKey(0)
 
 
     @classmethod

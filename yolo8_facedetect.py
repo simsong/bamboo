@@ -9,6 +9,7 @@ import math
 import argparse
 
 from frame import Frame
+from stage import Stage
 
 CONF_THRESHOLD = 0.45
 NMS_THRESHOLD = 0.50
@@ -174,6 +175,28 @@ class face_quality_assessment():
         outputs = self.net.forward(self.net.getUnconnectedOutLayersNames())
         return outputs[0].reshape(-1)
 
+class Yolo8FaceDetect(Stage):
+    # Initialize YOLOv8_face object detector
+    face_detector = YOLOv8_face("etc/yolov8/yolov8n-face.onnx", conf_thres=CONF_THRESHOLD, iou_thres=NMS_THRESHOLD)
+    fqa = face_quality_assessment("etc/yolov8/face-quality-assessment.onnx")
+
+    def process(self, f:Frame):
+        # Detect Objects
+        boxes, scores, classids, kpts = self.face_detector.detect(f.img)
+        for i, box in enumerate(boxes):
+            x, y, w, h = box.astype(int)
+            crop_img = f.img[y:y + h, x:x + w]  # crop - can also be done after facial alignment
+            fqa_probs = self.fqa.detect(crop_img)    # get the face quality
+            fqa_prob_mean = round(np.mean(fqa_probs), 2)
+
+            f.tags.append({"type":"face",
+                           "pt1": (x,y),
+                           "pt2": (x+w,y+h),
+                           "fqa_score" : fqa_prob_mean})
+
+        self.done(f)
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -182,25 +205,8 @@ if __name__ == '__main__':
     parser.add_argument('--nmsThreshold', default=NMS_THRESHOLD, type=float, help='nms iou thresh')
     args = parser.parse_args()
 
-    # Initialize YOLOv8_face object detector
-    face_detector = YOLOv8_face("etc/yolov8/yolov8n-face.onnx", conf_thres=args.confThreshold, iou_thres=args.nmsThreshold)
-    fqa = face_quality_assessment("etc/yolov8/face-quality-assessment.onnx")
-
     f = Frame(path=args.image)
-
-    # Detect Objects
-    boxes, scores, classids, kpts = face_detector.detect(f.img)
-    for i, box in enumerate(boxes):
-        x, y, w, h = box.astype(int)
-        crop_img = f.img[y:y + h, x:x + w]  ### crop - can also be done after facial alignment
-        fqa_probs = fqa.detect(crop_img)
-        fqa_prob_mean = round(np.mean(fqa_probs), 2)
-
-        f.annotate( (x,y), (x + w, y + h), "fqa_score:"+str(fqa_prob_mean))
-
+    y = Yolo8FaceDetect()
+    y.process(f)
+    f.show_tags()
     # cv2.imwrite('result.jpg', drawimg)
-    winName = 'Deep learning face-quality-assessment use OpenCV'
-    cv2.namedWindow(winName, 0)
-    cv2.imshow(winName, f.copy)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
