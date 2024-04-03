@@ -190,19 +190,17 @@ if __name__ == '__main__':
 
     # Detect Objects
     boxes, scores, classids, kpts = face_detector.detect(f.img)
-    drawimg = f.img.copy()
     for i, box in enumerate(boxes):
         x, y, w, h = box.astype(int)
         crop_img = f.img[y:y + h, x:x + w]  ### crop - can also be done after facial alignment
         fqa_probs = fqa.detect(crop_img)
         fqa_prob_mean = round(np.mean(fqa_probs), 2)
 
-        cv2.rectangle(drawimg, (x, y), (x + w, y + h), (0, 0, 255), thickness=2)
-        cv2.putText(drawimg, "fqa_score:"+str(fqa_prob_mean), (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), thickness=2)
+        f.annotate( (x,y), (x + w, y + h), "fqa_score:"+str(fqa_prob_mean))
 
     # cv2.imwrite('result.jpg', drawimg)
     winName = 'Deep learning face-quality-assessment use OpenCV'
     cv2.namedWindow(winName, 0)
-    cv2.imshow(winName, drawimg)
+    cv2.imshow(winName, f.copy)
     cv2.waitKey(0)
     cv2.destroyAllWindows()

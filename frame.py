@@ -32,6 +32,7 @@ class Frame():
         self.path = path
         self.tags = {}
         self.prev = None        # previous image
+        self.copy = None        # for annotation
         # Read the timestamp from the filename if present, otherwise gram from mtime
         try:
             self.mtime = datetime.fromisoformat( os.path.splitext(os.path.basename(path))[0] )
@@ -43,9 +44,14 @@ class Frame():
     def __repr__(self):
         return f"<Frame {os.path.basename(self.path)}>"
 
-    def annotate( pt1, pt2, text, *, color=C.GREEN, thickness=2):
+    def annotate( self, pt1, pt2, text, *, textcolor=C.GREEN, boxcolor=C.RED, thickness=2):
+        (x,y) = pt1
+
         if self.copy is None:
             self.copy = self.img.copy()
+        cv2.rectangle(self.copy, pt1, pt2, boxcolor, thickness=thickness)
+        cv2.putText(self.copy, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.8, textcolor, thickness=thickness)
+
 
     @classmethod
     def FrameStream(cls, source):
