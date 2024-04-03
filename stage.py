@@ -24,5 +24,7 @@ class Stage(ABC):
             obj.process(f)
 
 class ShowTags(Stage):
+    """Pipeline that shows the tags for every frame that has a tag"""
     def process(self, f:Frame):
-        f.show_tags()
+        if len(f.tags):
+            f.show_tags(title="tagged image", wait=1)

@@ -9,6 +9,7 @@ import cv2
 from ingest import Frame
 from stage import Stage,ShowTags
 from facedetect_yolo8 import Yolo8FaceDetect
+from facedetect_cv2 import OpenCVFaceDetector
 
 def run_root(pipeline, root):
     for frame in Frame.FrameStream(root):
@@ -26,7 +27,7 @@ if __name__=="__main__":
     # Create a simple pipline - run a face recognizer and print the results
     yfd = Yolo8FaceDetect()
     yfd.add_output( ocd := OpenCVFaceDetector())
-    ocd.add_output( ShowTags())
+    ocd.add_output( st:=ShowTags())
 
     if args.roots:
         for root in args.roots:

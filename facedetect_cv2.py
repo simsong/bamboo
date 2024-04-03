@@ -1,3 +1,4 @@
+import os
 from ingest import Frame
 from stage import Stage
 import cv2
@@ -22,13 +23,18 @@ class OpenCVFaceDetector(Stage):
                                                                  minNeighbors=10,
                                                                  minSize=(40,40),
                                                                  flags=cv2.CASCADE_SCALE_IMAGE)
+        for (x,y,w,h) in front_faces:
+            frame.tags.append({"type":"face",
+                               "pt1":(x,y),
+                               "pt2":(x+w,y+h),
+                               "text":"frontal_face"})
 
         profile_faces = self.profile_cascade.detectMultiScale(frame.img_grayscale, scaleFactor=1.1, minNeighbors=10,
                                                               minSize=(40,40),
                                                               flags=cv2.CASCADE_SCALE_IMAGE)
-        if len(front_faces):
-            print(frame.path,"front faces:",front_faces)
-        if len(profile_faces):
-            print(frame.path,"profile faces:",profile_faces)
-
+        for (x,y,w,h) in profile_faces:
+            frame.tags.append({"type":"face",
+                               "pt1":(x,y),
+                               "pt2":(x+w,y+h),
+                               "text":"profile_face"})
         self.done(frame)

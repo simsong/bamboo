@@ -192,7 +192,7 @@ class Yolo8FaceDetect(Stage):
             f.tags.append({"type":"face",
                            "pt1": (x,y),
                            "pt2": (x+w,y+h),
-                           "fqa_score" : fqa_prob_mean})
+                           "text" : f"fqa_score {fqa_prob_mean:4.2f}"})
 
         self.done(f)
 

@@ -50,15 +50,16 @@ class Frame():
         cv2.putText(i, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.8, textcolor, thickness=thickness)
 
 
-    def show_tags(self):
+    def show_tags(self, title=None, wait=0):
+        if title is None:
+            title=self.path
         i = self.img.copy()
-        winName = self.path
         for tag in self.tags:
             if tag['type']=='face':
-                self.annotate( i, tag['pt1'], tag['pt2'], text=f'fqa_score: {tag["fqa_score"]:4.2f}')
-        cv2.namedWindow(winName, 0)
-        cv2.imshow(winName, i)
-        cv2.waitKey(0)
+                self.annotate( i, tag['pt1'], tag['pt2'], text=tag['text'])
+        cv2.namedWindow(title, 0)
+        cv2.imshow(title, i)
+        cv2.waitKey(1)
 
 
     @classmethod
