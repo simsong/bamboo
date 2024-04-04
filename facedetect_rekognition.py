@@ -75,7 +75,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Create a 4-step pipeline to recognize the face, show the tags, extract the faces, and show each
-    p = Linear_pipeline([ RekognitionFaceDetect(), ShowTags(wait=0), ExtractFaces(), ShowFrames(wait=0) ])
+    p = Linear_pipeline([ RekognitionFaceDetect(), ShowTags(wait=0), ExtractFaces(scale=1.3), ShowFrames(wait=0) ])
     f = Frame(path=args.image)
     p.start(f)
     print(f.tags)
