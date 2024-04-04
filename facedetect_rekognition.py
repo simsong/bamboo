@@ -7,7 +7,8 @@ import os
 import sys
 from os.path import join
 from frame import Frame,Tag,FACE
-from stage import Stage
+from stage import Stage,Linear_pipeline,ShowTags,ShowFrames
+from face import ExtractFaces
 import shelve
 import json
 
@@ -62,8 +63,8 @@ class RekognitionFaceDetect(Stage):
                             pt2 = bot_right,
                             text = "aws face",
                             faceDetails = fd))
+        self.output(f)
 
-        return
 
 
 
@@ -73,9 +74,8 @@ if __name__ == '__main__':
     parser.add_argument('image', type=str, help="image path")
     args = parser.parse_args()
 
+    # Create a 4-step pipeline to recognize the face, show the tags, extract the faces, and show each
+    p = Linear_pipeline([ RekognitionFaceDetect(), ShowTags(wait=0), ExtractFaces(), ShowFrames(wait=0) ])
     f = Frame(path=args.image)
-    r = RekognitionFaceDetect()
-    r.process(f)
+    p.start(f)
     print(f.tags)
-    f.show_tags()
-    # cv2.imwrite('result.jpg', drawimg)

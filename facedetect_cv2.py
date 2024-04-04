@@ -22,23 +22,24 @@ class OpenCVFaceDetector(Stage):
     frontal_face_cascade = cv2.CascadeClassifier( cv2_cascade('haarcascade_frontalface_default.xml'))
     profile_cascade = cv2.CascadeClassifier( cv2_cascade('haarcascade_profileface.xml'))
 
-    def process(self, frame:Frame):
-        front_faces = self.frontal_face_cascade.detectMultiScale(frame.img_grayscale,
+    def process(self, f:Frame):
+        front_faces = self.frontal_face_cascade.detectMultiScale(f.img_grayscale,
                                                                  scaleFactor=1.1,
                                                                  minNeighbors=10,
                                                                  minSize=(40,40),
                                                                  flags=cv2.CASCADE_SCALE_IMAGE)
         for (x,y,w,h) in front_faces:
-            frame.add_tag(Tag( FACE,
+            f.add_tag(Tag( FACE,
                                pt1 = (x,y),
                                pt2 = (x+w,y+h),
                                text = "cv2 frontal_face"))
 
         profile_faces = self.profile_cascade.detectMultiScale(
-            frame.img_grayscale, scaleFactor=1.1, minNeighbors=10,
+            f.img_grayscale, scaleFactor=1.1, minNeighbors=10,
             minSize=(40,40),
             flags=cv2.CASCADE_SCALE_IMAGE)
 
         for (x,y,w,h) in profile_faces:
-            frame.add_tag(Tag(FACE, pt1=(x,y),pt2=(x+w,y+h), text="cv2 profile_face"))
-        self.done(frame)
+            f.add_tag(Tag(FACE, pt1=(x,y),pt2=(x+w,y+h), text="cv2 profile_face"))
+
+        self.output(f)

@@ -190,8 +190,8 @@ class Yolo8FaceDetect(Stage):
 
             f.add_tag(Tag(FACE, pt1=(x,y), pt2=(x+w,y+h), fqa = fqa_prob_mean,
                           text=f"fqa_score {fqa_prob_mean:4.2f}"))
+        self.output(f)
 
-        self.done(f)
 
 
 
@@ -204,6 +204,6 @@ if __name__ == '__main__':
 
     f = Frame(path=args.image)
     y = Yolo8FaceDetect()
-    y.process(f)
+    y.start(f)
     f.show_tags()
     # cv2.imwrite('result.jpg', drawimg)

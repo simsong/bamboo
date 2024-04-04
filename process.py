@@ -17,7 +17,7 @@ def run_root(pipeline, root):
     for frame in Frame.FrameStream(root):
         print(frame)
         try:
-            pipeline.process(frame)
+            pipeline.start(frame)
         except cv2.error as e:
             print(f"Uncaught cv2 error in {frame.path}")
             print(e)

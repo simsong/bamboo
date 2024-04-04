@@ -63,19 +63,28 @@ class Frame:
     """Abstraction to hold an image frame."""
     def __init__(self, *, path=None):
         self.path = path
+        self.src  = path
         self.tags = []
         self.prev = None        # previous image
         self.copy = None        # for annotation
+        # These can be overridden
+        self.width_ = None
+        self.height_ = None
+        self.depth_ = None
+        self.bytes_ = None
+        self.img_   = None
         # Read the timestamp from the filename if present, otherwise gram from mtime
         try:
             self.mtime = datetime.fromisoformat( os.path.splitext(os.path.basename(path))[0] )
         except ValueError:
             self.mtime = datetime.fromtimestamp(os.path.getmtime(path))
+        except TypeError:
+            self.mtime = datetime.now()
 
     def __lt__(self, b):
         return  self.mtime < b.mtime
     def __repr__(self):
-        return f"<Frame {os.path.basename(self.path)}>"
+        return f"<Frame path={self.path}>"
 
     def hash(self):
         """Return a unique hash of the image"""
@@ -89,16 +98,26 @@ class Frame:
     def add_tag(self, tag):
         self.tags.append(tag)
 
-    def show_tags(self, title=None, wait=0):
+    def show(self, i=None, title=None, wait=0):
+        """show the frame, optionally waiting for keyboard"""
         if title is None:
-            title=self.path
+            title = self.path
+        if title is None:
+            title = self.src
+        if title is None:
+            title = ""
+        if i is None:
+            i = self.img
+        cv2.namedWindow(title, 0)
+        cv2.imshow(title, i)
+        cv2.waitKey(wait)
+
+    def show_tags(self, title=None, wait=0):
         i = self.img.copy()
         for tag in self.tags:
             if tag.type==FACE:
                 self.annotate( i, tag.pt1, tag.pt2, text=tag.text)
-        cv2.namedWindow(title, 0)
-        cv2.imshow(title, i)
-        cv2.waitKey(wait)
+        self.show(i=i, title=title, wait=wait)
 
     @classmethod
     def FrameStream(cls, source):
@@ -116,7 +135,7 @@ class Frame:
     @property
     def img(self):
         """return an opencv image object."""
-        return image_read(self.path)
+        return self.img_ if self.img_ is not None else image_read(self.path)
 
     @property
     def img_grayscale(self):
@@ -125,22 +144,22 @@ class Frame:
 
     @property
     def bytes(self):
-        return bytes_read(self.path)
+        return self.img.tobytes()
 
     @property
     @functools.lru_cache(maxsize=3)
     def width(self):
-        return self.img.shape[0]
+        return self.width_ if self.width_ is not None else self.img.shape[0]
 
     @property
     @functools.lru_cache(maxsize=3)
     def height(self):
-        return self.img.shape[1]
+        return self.height_  if self.height_  is not None else self.img.shape[1]
 
     @property
     @functools.lru_cache(maxsize=3)
     def depth(self):
-        return self.img.shape[2]
+        return self.depth_ if self.depth_ is not None else self.img.shape[2]
 
     @functools.lru_cache(maxsize=10)
     def similarity(self, i2):
@@ -148,6 +167,22 @@ class Frame:
         if i2 is None:
             return 0            # not similar at all
         return img_sim(self.img, i2.img)
+
+    def crop(self, pt1, pt2):
+        """Return a new Frame that is the old one cropped"""
+        cf = CroppedFrame(self, pt1, pt2)
+        cf.src = "Cropped from "+self.src
+        return cf
+
+class CroppedFrame(Frame):
+    def __init__(self, src, pt1, pt2):
+        super().__init__()
+        self.width_ = pt2[0]-pt1[0]
+        self.height_ = pt2[1]-pt1[1]
+        self.img_ = np.copy(src.img[pt1[1]:pt2[1], pt1[0]:pt2[0]])
+        self.bytes_ = self.img_.tobytes()
+
+
 
 class FrameArray(list):
     """Array of frames"""
