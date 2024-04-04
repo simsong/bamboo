@@ -1,3 +1,8 @@
+"""
+Stage implementation and some simple stages.
+"""
+
+
 from abc import ABC,abstractmethod
 from frame import Frame
 
@@ -5,8 +10,9 @@ from frame import Frame
 class Stage(ABC):
     """Abstract base class for processing DAG"""
     def __init__(self):
-        self.inputs = set()
+        self.inputs  = set()
         self.outputs = set()
+        self.config  = {}
 
     def add_input(self, obj):
         self.inputs.add(obj)

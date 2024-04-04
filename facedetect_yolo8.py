@@ -1,6 +1,6 @@
 """
 From https://github.com/hpc203/yolov8-face-landmarks-opencv-dnn.
-Cleaned up and made a module for Bamboo pipline
+Cleaned up, translated to English from Chinese, and made a module for Bamboo pipline
 """
 
 import cv2
@@ -8,7 +8,7 @@ import numpy as np
 import math
 import argparse
 
-from frame import Frame
+from frame import Frame,Tag,FACE
 from stage import Stage
 
 CONF_THRESHOLD = 0.45
@@ -42,7 +42,6 @@ class YOLOv8_face:
             y = np.arange(0, h) + grid_cell_offset  # shift y
             sx, sy = np.meshgrid(x, y)
 
-            # sy, sx = np.meshgrid(y, x)
             anchor_points[stride] = np.stack((sx, sy), axis=-1).reshape(-1, 2)
         return anchor_points
 
@@ -130,7 +129,7 @@ class YOLOv8_face:
         confidences = np.max(scores, axis=1)  ####max_class_confidence
 
         mask = confidences > self.conf_threshold
-        bboxes_wh = bboxes_wh[mask]  ###合理使用广播法则
+        bboxes_wh = bboxes_wh[mask]  # Reasonable use of broadcasting rules
         confidences = confidences[mask]
         classIds = classIds[mask]
         landmarks = landmarks[mask]
@@ -189,10 +188,8 @@ class Yolo8FaceDetect(Stage):
             fqa_probs = self.fqa.detect(crop_img)    # get the face quality
             fqa_prob_mean = round(np.mean(fqa_probs), 2)
 
-            f.tags.append({"type":"face",
-                           "pt1": (x,y),
-                           "pt2": (x+w,y+h),
-                           "text" : f"fqa_score {fqa_prob_mean:4.2f}"})
+            f.add_tag(Tag(FACE, pt1=(x,y), pt2=(x+w,y+h), fqa = fqa_prob_mean,
+                          text=f"fqa_score {fqa_prob_mean:4.2f}"))
 
         self.done(f)
 

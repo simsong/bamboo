@@ -128,7 +128,7 @@ class IngestCamera():
                     continue
                 if score > self.sim_threshold:
                     skipped += 1
-                    i.tags['skipped'] = skipped
+                    i.add_tag(Tag("skipped"))
                 else:
                     self.ingest_save_image(i)
                     # self.ingest_save_image(prev) # also save the previous one
