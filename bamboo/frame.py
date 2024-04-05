@@ -162,7 +162,7 @@ class Frame:
                         if os.path.getsize(path)>0:
                             yield Frame(path=path)
         else:
-            yield Frame(path=source)
+            yield Frame(path=root)
 
     @classmethod
     def DissimilarFrameStream(cls, root, score=0.90):
@@ -193,12 +193,13 @@ class Frame:
     @property
     @functools.lru_cache(maxsize=3)
     def width(self):
-        return self.width_ if self.width_ is not None else self.img.shape[0]
+        return self.width_ if self.width_ is not None else self.img.shape[1]
 
     @property
     @functools.lru_cache(maxsize=3)
     def height(self):
-        return self.height_  if self.height_  is not None else self.img.shape[1]
+        """height (y) is the first index in the shape. nparray goes from lsb to msb"""
+        return self.height_  if self.height_  is not None else self.img.shape[0]
 
     @property
     @functools.lru_cache(maxsize=3)

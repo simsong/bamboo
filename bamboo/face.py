@@ -24,8 +24,9 @@ class ExtractFaces(Stage):
                 hheight = int((t.pt2[1]-t.pt1[1]) * self.scale //2)
 
                 # Apply the scale
-                pt1 = ( max(cx-hwidth,0), max(cy-hheight,0) )
+                pt1 = ( max(cx-hwidth,0),       max(cy-hheight,0) )
                 pt2 = ( min(cx+hwidth,f.width), min(cy+hheight, f.height) )
+                print("f.width=",f.width,"f.height=",f.height,"cx=",cx,"cy=",cy,"hwidth=",hwidth,"hheight=",hheight,"pt1=",pt1,"pt2=",pt2)
 
                 f2 = f.crop( pt1, pt2 )
                 count += 1

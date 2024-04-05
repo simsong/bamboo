@@ -169,3 +169,5 @@ config.json
 etc/dynamodb-local
 config.yml
 .DS_Store
+out
+*.ipynb

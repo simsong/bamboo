@@ -3,6 +3,8 @@
 A simple pipeline to extract all of the faces from a set of photos and write them to a directory.
 """
 
+import os
+
 from bamboo.stage import SingleThreadedPipeline, ShowTags, WriteToDirectory
 from facedetect_yolo8 import Yolo8FaceDetect
 from bamboo.face import ExtractFaces
@@ -22,4 +24,5 @@ if __name__=="__main__":
                           ShowTags(wait=10000),
                           ExtractFaces(scale=1.3),
                           WriteToDirectory(args.outdir, template="{counter:08}.jpg") ])
+
     p.process_list( Frame.FrameStream( args.root ) )
