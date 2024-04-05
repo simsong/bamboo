@@ -5,6 +5,7 @@ import os
 import functools
 from datetime import datetime
 import json
+import copy
 
 import cv2
 import numpy as np
@@ -29,14 +30,17 @@ def hash_read(path):
 
 @functools.lru_cache(maxsize=128)
 def image_read(path):
-    """Caching image read. We cache to minimize what's stored in memory"""
-    #return cv2.imread(path)
-    return cv2.imdecode(np.frombuffer( bytes_read(path), np.uint8), cv2.IMREAD_ANYCOLOR)
+    """Caching image read. We cache to minimize what's stored in memory. We make it immutable to allow sharing"""
+    img = cv2.imdecode(np.frombuffer( bytes_read(path), np.uint8), cv2.IMREAD_ANYCOLOR)
+    img.flags.writeable = False
+    return img
 
 @functools.lru_cache(maxsize=128)
 def image_grayscale(path):
     """Caching image bw. We cache to minimize what's stored in memory"""
-    return cv2.cvtColor(image_read(path), cv2.COLOR_BGR2GRAY)
+    img = cv2.cvtColor(image_read(path), cv2.COLOR_BGR2GRAY)
+    img.flags.writable = False
+    return img
 
 def similarity_for_two(t):
     """Similarity of two CV2 images on a scale of 0 to 1.0.
@@ -60,14 +64,13 @@ class Tag:
 
 
 class Frame:
-    """Abstraction to hold an image frame."""
+    """Abstraction to hold an image frame. If a stage modifies a Frame, it needs to make a copy first."""
     def __init__(self, *, path=None):
         self.path = path
         self.src  = path
         self.tags = []
-        self.prev = None        # previous image
-        self.copy = None        # for annotation
-        # These can be overridden
+        self.tags_added = 0
+        # These are for overriding the properties
         self.width_ = None
         self.height_ = None
         self.depth_ = None
@@ -86,6 +89,20 @@ class Frame:
     def __repr__(self):
         return f"<Frame path={self.path}>"
 
+    def copy(self):
+        """Returns a copy, but with the original img and tags. Setting a tag makes that copy.
+        If you want to draw into the img, use crop() or writable_copy()
+        """
+        return copy.copy(self)
+
+    def writable_copy(self):
+        """Returns a copy into which we can write"""
+        c = self.copy()
+        c.img_ = self.img.copy()
+        c.img_.flags.writable=True
+        c.path_ = None
+        return c
+
     def hash(self):
         """Return a unique hash of the image"""
         return hash_read(self.path)
@@ -96,7 +113,11 @@ class Frame:
         cv2.putText(i, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.8, textcolor, thickness=thickness)
 
     def add_tag(self, tag):
+        # Before we add the first tag, copy the tags array so that this frame has its own copy of the array
+        if self.tags_added == 0:
+            self.tags = copy.copy(self.tags)
         self.tags.append(tag)
+        self.tags_added += 1
 
     def show(self, i=None, title=None, wait=0):
         """show the frame, optionally waiting for keyboard"""
@@ -134,7 +155,7 @@ class Frame:
 
     @property
     def img(self):
-        """return an opencv image object."""
+        """return an opencv image object that is not writable."""
         return self.img_ if self.img_ is not None else image_read(self.path)
 
     @property
@@ -182,8 +203,6 @@ class CroppedFrame(Frame):
         self.img_ = np.copy(src.img[pt1[1]:pt2[1], pt1[0]:pt2[0]])
         self.bytes_ = self.img_.tobytes()
 
-
-
 class FrameArray(list):
     """Array of frames"""
     def __init__(self, *args, **kwargs):
@@ -209,8 +228,3 @@ class FrameArray(list):
 
     def first(self):
         return self.firstn(1)[0]
-
-    def set_prev_pointers(self):
-        self.sort()
-        for n in range(1,len(self)):
-            self[n].prev = self[n-1]

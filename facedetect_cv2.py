@@ -23,6 +23,7 @@ class OpenCVFaceDetector(Stage):
     profile_cascade = cv2.CascadeClassifier( cv2_cascade('haarcascade_profileface.xml'))
 
     def process(self, f:Frame):
+        f = f.copy()            # we will be adding tags
         front_faces = self.frontal_face_cascade.detectMultiScale(f.img_grayscale,
                                                                  scaleFactor=1.1,
                                                                  minNeighbors=10,

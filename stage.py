@@ -10,15 +10,43 @@ from abc import ABC,abstractmethod
 
 from frame import Frame
 
-class Linear_pipeline:
-    def __init__(self, stages:list):
+class Pipeline(ABC):
+    """Base pipeline class"""
+    def __init__(self):
+        self.queued_output_stage_frame_pairs = collections.deque()
+        self.head = None
+
+    def queue_output_stage_frame_pair(self, pair):
+        self.queued_output_stage_frame_pairs.append(pair)
+
+    def addLinearPipeline(self, stages:list):
         self.head = stages[0]
         for i in range(len(stages)-1):
+            stages[i].pipeline = self
+            stages[i+1].pipeline = self
             Connect( stages[i], stages[i+1] )
+        return (stages[0],stages[-1])
+
+class SingleThreadedPipeline(Pipeline):
+    """Runs the pipeline in the caller's thread"""
+    def __init__(self):
+        super().__init__()
+
+    def run_queue(self):
+        # Now pass to the next. This logic needs to be moved into the linear pipeline and have the output function store
+        # (s,f) pairs.
+        while True:
+            try:
+                (s,f) = self.queued_output_stage_frame_pairs.pop()
+            except IndexError:
+                break
+            print(s,f)
+            s._run_frame(f)
+
     def start(self, f):
         """Run a frame through the pipeline. This interface will be moved entirely into the pipeline"""
-        self.head._start(f)
-
+        self.queue_output_stage_frame_pair( (self.head, f))
+        self.run_queue()
 
 class Stage(ABC):
     """Abstract base class for processing DAG"""
@@ -31,14 +59,14 @@ class Stage(ABC):
         self.sum_t   = 0
         self.sum_t2  = 0
         self.count   = 0
+        self.pipeline = None    # my pipeline
         self.registered_stages.append(self)
-        self.queued_output_stage_frame_pairs = collections.deque()
 
     @abstractmethod
     def process(self, frame:Frame):
         """Called to process"""
 
-    def _start(self,f):
+    def _run_frame(self,f):
         """called at the start of processing of this stage.
         Processes and then passes the frame to the output stages."""
         t0 = time.time()
@@ -48,19 +76,12 @@ class Stage(ABC):
         self.sum_t2 += (t*t)
         self.count  += 1
 
-        # Now pass to the next. This logic needs to be moved into the linear pipeline and have the output function store
-        # (s,f) pairs.
-        while True:
-            try:
-                (s,f) = self.queued_output_stage_frame_pairs.pop()
-            except IndexError:
-                break
-            s._start(f)
-
     def output(self,f):
-        """output(f) queues f for output when the current stage is done."""
+        """output(f) queues f for output when the current stage is done.
+        If f is modified, it needs to be copied.
+        """
         for s in self.next_stages:
-            self.queued_output_stage_frame_pairs.append( (s,f) )
+            self.pipeline.queue_output_stage_frame_pair( (s,f) )
 
     @property
     def t_mean(self):

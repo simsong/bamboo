@@ -158,7 +158,7 @@ class YOLOv8_face:
             y2 = np.clip(y2, 0, max_shape[0])
         return np.stack([x1, y1, x2, y2], axis=-1)
 
-class face_quality_assessment():
+class FaceQualityAssessment():
     def __init__(self, path):
         # Initialize model
         self.net = cv2.dnn.readNet(path)
@@ -177,10 +177,11 @@ class face_quality_assessment():
 class Yolo8FaceDetect(Stage):
     # Initialize YOLOv8_face object detector
     face_detector = YOLOv8_face("etc/yolov8/yolov8n-face.onnx", conf_thres=CONF_THRESHOLD, iou_thres=NMS_THRESHOLD)
-    fqa = face_quality_assessment("etc/yolov8/face-quality-assessment.onnx")
+    fqa = FaceQualityAssessment("etc/yolov8/face-quality-assessment.onnx")
 
     def process(self, f:Frame):
         # Detect Objects
+        f = f.copy()            # we will be adding tags
         boxes, scores, classids, kpts = self.face_detector.detect(f.img)
         for i, box in enumerate(boxes):
             x, y, w, h = box.astype(int)
@@ -191,9 +192,6 @@ class Yolo8FaceDetect(Stage):
             f.add_tag(Tag(FACE, pt1=(x,y), pt2=(x+w,y+h), fqa = fqa_prob_mean,
                           text=f"fqa_score {fqa_prob_mean:4.2f}"))
         self.output(f)
-
-
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

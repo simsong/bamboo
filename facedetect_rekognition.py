@@ -7,10 +7,11 @@ import os
 import sys
 from os.path import join
 from frame import Frame,Tag,FACE
-from stage import Stage,Linear_pipeline,ShowTags,ShowFrames
+from stage import Stage,SingleThreadedPipeline,ShowTags,ShowFrames
 from face import ExtractFaces
 import shelve
 import json
+import copy
 
 from filelock import FileLock
 
@@ -40,7 +41,7 @@ class RekognitionFaceDetect(Stage):
     profile_name=DEFAULT_PROFILE
 
     def process(self, f:Frame):
-
+        f = f.copy()            # we will be adding tags
         try:
             faceDetails = get_info(f)
         except KeyError:
@@ -75,7 +76,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Create a 4-step pipeline to recognize the face, show the tags, extract the faces, and show each
-    p = Linear_pipeline([ RekognitionFaceDetect(), ShowTags(wait=0), ExtractFaces(scale=1.3), ShowFrames(wait=0) ])
+    p = SingleThreadedPipeline()
+    p.addLinearPipeline([ RekognitionFaceDetect(), ShowTags(wait=0), ExtractFaces(scale=1.3), ShowFrames(wait=0) ])
     f = Frame(path=args.image)
     p.start(f)
     print(f.tags)

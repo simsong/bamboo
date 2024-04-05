@@ -108,8 +108,6 @@ class IngestCamera():
         for f in Frame.FrameStream(self.config['source']):
             ary.add(f)
 
-        ary.set_prev_pointers()
-
         # Get the first and retain
         ref = ary.first()
         self.ingest_save_image(ref)
@@ -131,7 +129,6 @@ class IngestCamera():
                     i.add_tag(Tag("skipped"))
                 else:
                     self.ingest_save_image(i)
-                    # self.ingest_save_image(prev) # also save the previous one
                     ref = i
             print("fps: ",len(ary) / t.elapsed(),end=' ')
 
