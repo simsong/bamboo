@@ -2,8 +2,8 @@
 A number of stages that work with frames that are tagged with faces.
 """
 
-from frame import Frame,FACE
-from stage import Stage
+from .frame import Frame,FACE,Tag
+from .stage import Stage
 
 class ExtractFaces(Stage):
     """pull faces out of the pipeline and pass them on"""
@@ -14,6 +14,7 @@ class ExtractFaces(Stage):
         self.scale = scale
 
     def process(self, f:Frame):
+        count = 0
         for t in f.tags:
             if t.type==FACE:
                 # Find the existing center, width and height
@@ -26,4 +27,7 @@ class ExtractFaces(Stage):
                 pt1 = ( max(cx-hwidth,0), max(cy-hheight,0) )
                 pt2 = ( min(cx+hwidth,f.width), min(cy+hheight, f.height) )
 
-                self.output( f.crop( pt1, pt2 ))
+                f2 = f.crop( pt1, pt2 )
+                count += 1
+                f2.add_tag(Tag('extract',extract_count=count))
+                self.output( f2 )

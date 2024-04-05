@@ -3,12 +3,13 @@ Stage implementation and some simple stages.
 """
 
 
+import os
 import time
 import math
 import collections
 from abc import ABC,abstractmethod
 
-from frame import Frame
+from .frame import Frame
 
 class Pipeline(ABC):
     """Base pipeline class"""
@@ -27,6 +28,15 @@ class Pipeline(ABC):
             Connect( stages[i], stages[i+1] )
         return (stages[0],stages[-1])
 
+    def process(self, f):
+        """Run a frame through the pipeline. This interface will be moved entirely into the pipeline"""
+        self.queue_output_stage_frame_pair( (self.head, f))
+        self.run_queue()
+
+    def process_list(self, flist):
+        for f in flist:
+            self.process(f)
+
 class SingleThreadedPipeline(Pipeline):
     """Runs the pipeline in the caller's thread"""
     def __init__(self):
@@ -37,16 +47,11 @@ class SingleThreadedPipeline(Pipeline):
         # (s,f) pairs.
         while True:
             try:
-                (s,f) = self.queued_output_stage_frame_pairs.pop()
+                (s,f) = self.queued_output_stage_frame_pairs.popleft()
             except IndexError:
                 break
             print(s,f)
             s._run_frame(f)
-
-    def start(self, f):
-        """Run a frame through the pipeline. This interface will be moved entirely into the pipeline"""
-        self.queue_output_stage_frame_pair( (self.head, f))
-        self.run_queue()
 
 class Stage(ABC):
     """Abstract base class for processing DAG"""
@@ -127,6 +132,22 @@ class Multiplex(Stage):
     """Simply copies from intputs to outputs. Of course, that's the basic functionality, so we do nothing."""
     def process(self, f:Frame):
         self.output(f)
+
+class WriteToDirectory(Stage):
+    def __init__(self, root, template):
+        super().__init__()
+        self.root = root
+        self.counter = 0
+        self.template = template
+    def process(self, f:Frame):
+        fname = os.path.join(self.root, self.template.format(counter=self.counter))
+        f.save(fname)
+        if self.counter==22: abort()
+        self.counter += 1
+
+
+
+
 
 def Connect(prev_:Stage, next_:Stage):
     """Make the output of stage prev_ go to next_"""

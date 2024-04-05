@@ -2,3 +2,5 @@ opencv-python
 scikit-image
 imutils
 pyyaml
+deepface
+tf-keras

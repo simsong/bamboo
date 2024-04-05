@@ -8,8 +8,8 @@ import numpy as np
 import math
 import argparse
 
-from frame import Frame,Tag,FACE
-from stage import Stage
+from bamboo.stage import Stage
+from bamboo.frame import Frame,Tag,FACE
 
 CONF_THRESHOLD = 0.45
 NMS_THRESHOLD = 0.50
@@ -200,8 +200,8 @@ if __name__ == '__main__':
     parser.add_argument('--nmsThreshold', default=NMS_THRESHOLD, type=float, help='nms iou thresh')
     args = parser.parse_args()
 
+    p = SingleThreadedPipeline()
+    p.addLinearPipeline([ Yolo8FaceDetect(), ShowTags(wait=0), ExtractFaces(scale=1.3), ShowFrames(wait=0) ])
     f = Frame(path=args.image)
-    y = Yolo8FaceDetect()
-    y.start(f)
-    f.show_tags()
-    # cv2.imwrite('result.jpg', drawimg)
+    p.process(f)
+    print(f.tags)

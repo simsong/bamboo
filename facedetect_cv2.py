@@ -44,3 +44,17 @@ class OpenCVFaceDetector(Stage):
             f.add_tag(Tag(FACE, pt1=(x,y),pt2=(x+w,y+h), text="cv2 profile_face"))
 
         self.output(f)
+
+# A little test program
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('image', type=str, help="image path")
+    parser.add_argument('--confThreshold', default=CONF_THRESHOLD, type=float, help='class confidence')
+    parser.add_argument('--nmsThreshold', default=NMS_THRESHOLD, type=float, help='nms iou thresh')
+    args = parser.parse_args()
+
+    p = SingleThreadedPipeline()
+    p.addLinearPipeline([ Yolo8FaceDetect(), ShowTags(wait=0), ExtractFaces(scale=1.3), ShowFrames(wait=0) ])
+    f = Frame(path=args.image)
+    p.process(f)
+    print(f.tags)

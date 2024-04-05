@@ -6,9 +6,6 @@ Because rekognition is expensive, results are cached (by some unique identifier)
 import os
 import sys
 from os.path import join
-from frame import Frame,Tag,FACE
-from stage import Stage,SingleThreadedPipeline,ShowTags,ShowFrames
-from face import ExtractFaces
 import shelve
 import json
 import copy
@@ -19,6 +16,10 @@ from filelock import FileLock
 import boto3
 
 import filelock
+
+from bamboo.frame import Frame,Tag,FACE
+from bamboo.stage import Stage,SingleThreadedPipeline,ShowTags,ShowFrames
+from bamboo.face import ExtractFaces
 
 ARCHIVE_PATH = join(os.environ["HOME"],'.rekognition-cache')
 ARCHIVE_LOCK = ARCHIVE_PATH + ".lock"
@@ -79,5 +80,5 @@ if __name__ == '__main__':
     p = SingleThreadedPipeline()
     p.addLinearPipeline([ RekognitionFaceDetect(), ShowTags(wait=0), ExtractFaces(scale=1.3), ShowFrames(wait=0) ])
     f = Frame(path=args.image)
-    p.start(f)
+    p.process(f)
     print(f.tags)

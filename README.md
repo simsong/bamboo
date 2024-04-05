@@ -16,24 +16,38 @@ Take data from a variety of streams, including:
 * Cell phones repurposed as surveillance cameras
 * (ESP32-cam)[https://google.com/search?q=ESP32-CAM]
 
+Plug-in architecture:
+* It's clear that we will always want to be able to have a plug-in interface and be able to support multiple plugins at each step of the pipeline.
+  -  We can have the plugins union, intersection, or vote.
+  - With two plugins, we can compare them against each other (for running experiments.)
+
+Processing options:
+* Single-threaded on local machine for debugging
+* Multi-threaded on local machine for performance
+* Lambda or GCF of Azure Functions
+
 
 ## Enabling technologies we require (and what we are thinking of using)
-Video change detection:
-
-
-Object detection in a video:
-
-Face recognition:
-
-Structured database:
-* Stores the result of the tagged video
-
-Video storage:
-
-* Can store frames or compressed video. Frames are higher quality; compressed video stores more.  (Video is compressed as a series of I & D frames)
+* Video change detection
+* Object detection in a video
+* Face recognition:
+* Structured database
+  - Stores the result of the tagged video
+* Video storage
+  - Can store frames or compressed video. Frames are higher quality; compressed video stores more.  (Video is compressed as a series of I & D frames)
 
 # Prototype
 Initially we will prototype a number of small scripts to get an ideas of how this stuff works.
+
+## Acquisition
+https://meraki.cisco.com/lib/pdf/meraki_datasheet_mv_sense.pdf
+https://documentation.meraki.com/General_Administration/Other_Topics/Cisco_Meraki_Dashboard_API
+
+## ingest.py
+- Iterate through all of the jpegs that have been captured in chronological order.
+- When a JPEG has significantly changed, copy it to the image store (local or s3) and run it through image processing.
+- Store the results of the image processing in a scalable store as a JSON object.
+  - Store results by recognizer, so we can use several of them.
 
 ## Storage
 JPEGs: We're storing individual JPEGs in a directory hiearchy that is optimized to have 1000-5000 images per prefix (directory).
@@ -44,15 +58,11 @@ We anticipate that we'll have ~ 10-500 images per camera per day (local time or 
   {root}/{camera}/{year:04-month:02}/{yearmonthday-hourminsec}.jpeg
 ```
 
-## ingest.py
-- Iterate through all of the jpegs that have been captured in chronological order.
-- When a JPEG has significantly changed, copy it to the image store (local or s3) and run it through image processing.
-- Store the results of the image processing in a scalable store as a JSON object.
-  - Store results by recognizer, so we can use several of them.
-
 ## faces.py - show all faces on a given day
 
 # Architecture
+
+
 
 ## Ingest
 
@@ -65,8 +75,6 @@ Identifying which frames to process:
 
 Current implementation:
 * (ingest.py)[./ingest.py]
-
-
 
 ## Processing
 Processing frames:
@@ -82,21 +90,27 @@ Processing frames:
      - An ensemble processor automatically stores results that can be used for producing experimental reports.
 
 
-Processing Pipeline design:
-1.
-
 # Technology Stack
 * Python
 * OpenCV
 * DynamoDB for tag storage (develop with (DynamoDB Local)[https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html])
 * AWS Rekognition
   - Pricing: https://aws.amazon.com/rekognition/pricing/
+* Open Source Face Recognition options
+  * OpenFace - https://github.com/TadasBaltrusaitis/OpenFace - v2.2.0 - July 13, 2019
+* Open Source frameworks:
+  * Facenet - https://github.com/davidsandberg/facenet - (2018)
+  * face_recognition - https://github.com/ageitgey/face_recognition - "The world's simplest facial recognition api for Python and the command line" (2018)
+  * https://github.com/serengil/deepface (current)
+    - "A Lightweight Face Recognition and Facial Attribute Analysis (Age, Gender, Emotion and Race) Library for Python"
+    - pip install
+    - highly accurate detection
+    - Creates embeddings
+    - "Deepface is a hybrid face recognition package. It currently wraps many state-of-the-art face recognition models: VGG-Face , Google FaceNet, OpenFace, Facebook DeepFace, DeepID, ArcFace, Dlib, SFace and GhostFaceNet. The default configuration uses VGG-Face model."
+  * https://github.com/SthPhoenix/InsightFace-REST (current) - NVIDIA & TensorRT for optimized inference
 
-
-## Plug-in architecture
-* It's clear that we will always want to be able to have a plug-in interface and be able to support multiple plugins at each step of the pipeline.
-  1. We can have the plugins union, intersection, or vote.
-  2. With two plugins, we can compare them against each other (for running experiments.)
+Face clustering:
+ * https://pyimagesearch.com/2018/07/09/face-clustering-with-python/
 
 Do we want to have an abstract pipeline object?
 - Input and output

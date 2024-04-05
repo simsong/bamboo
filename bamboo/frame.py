@@ -1,5 +1,12 @@
 """
-Frame holds individual frames and logic for working on individual frames with OpenCV.
+This module provides the following classes:
+
+Tag - For adding (k,v) tags to Frames. The "v" is an arbitrary python value or object.
+Frame - Holds individual frames and logic for working on individual frames with OpenCV.
+Frame.FrameStream(root) - A generator of frames from a root
+Frame.DissimilarFrameStream(root, score=0.90) - Generates a stream of frames that have a similarity score less than socre
+
+
 """
 import os
 import functools
@@ -11,8 +18,8 @@ import cv2
 import numpy as np
 import hashlib
 
-from constants import C
-from similarity.sim1 import img_sim
+from .constants import C
+from .image_utils import img_sim
 
 ## several functions for reading images. All cache.
 ## This allows us to just pass around the path and read the bytes or the cv2 image rapidly from the cache
@@ -60,7 +67,7 @@ class Tag:
         for (k,v) in kwargs.items():
             setattr(self, k, v)
     def __repr__(self):
-        return f"<TAG {self.type} {json.dumps(self.__dict__)}>"
+        return f"<TAG {self.type} {json.dumps(self.__dict__,default=str)}>"
 
 
 class Frame:
@@ -87,7 +94,10 @@ class Frame:
     def __lt__(self, b):
         return  self.mtime < b.mtime
     def __repr__(self):
-        return f"<Frame path={self.path}>"
+        return f"<Frame path={self.path} src={self.src} tags={self.tags}>"
+
+    def save(self, fname):
+        cv2.imwrite(fname, self.img)
 
     def copy(self):
         """Returns a copy, but with the original img and tags. Setting a tag makes that copy.
@@ -141,10 +151,11 @@ class Frame:
         self.show(i=i, title=title, wait=wait)
 
     @classmethod
-    def FrameStream(cls, source):
-        """Generator for a series of Frame() objects."""
-        if os.path.isdir(source):
-            for (dirpath, dirnames, filenames) in os.walk(source): # pylint: disable=unused-variable
+    def FrameStream(cls, root):
+        """Generator for a series of Frame() objects. Returns frames in sort order within each directory"""
+        if os.path.isdir(root):
+            for (dirpath, dirnames, filenames) in os.walk(root): # pylint: disable=unused-variable
+                dirnames.sort()                                  # makes the directories recurse in sort order
                 for fname in sorted(filenames):
                     if os.path.splitext(fname)[1].lower() in C.IMAGE_EXTENSIONS:
                         path = os.path.join(dirpath, fname)
@@ -153,6 +164,18 @@ class Frame:
         else:
             yield Frame(path=source)
 
+    @classmethod
+    def DissimilarFrameStream(cls, root, score=0.90):
+        ref = None
+        for f in self.FrameStream(root):
+            try:
+                score = f.similarity(ref)
+            except cv2.error as e: # pylint: disable=catching-non-exception
+                print(f"Error {e} with {i.path}",file=sys.stderr)
+                continue
+            if score <= self.sim_threshold:
+                yield f
+                ref = f
     @property
     def img(self):
         """return an opencv image object that is not writable."""
@@ -192,16 +215,21 @@ class Frame:
     def crop(self, pt1, pt2):
         """Return a new Frame that is the old one cropped"""
         cf = CroppedFrame(self, pt1, pt2)
-        cf.src = "Cropped from "+self.src
         return cf
 
 class CroppedFrame(Frame):
     def __init__(self, src, pt1, pt2):
         super().__init__()
-        self.width_ = pt2[0]-pt1[0]
-        self.height_ = pt2[1]-pt1[1]
-        self.img_ = np.copy(src.img[pt1[1]:pt2[1], pt1[0]:pt2[0]])
+        min_x = min(pt1[0],pt2[0])
+        min_y = min(pt1[1],pt2[1])
+        max_x = max(pt1[0],pt2[0])
+        max_y = max(pt1[1],pt2[1])
+        self.src = f"Cropped from {self.src} [{min_x}:{max_x}, {min_y}:{max_y}]"
+        self.width_ = max_x - min_x
+        self.height_ = max_y - min_y
+        self.img_ = np.copy(src.img[min_y:max_y, min_x:max_x])
         self.bytes_ = self.img_.tobytes()
+
 
 class FrameArray(list):
     """Array of frames"""
