@@ -5,9 +5,19 @@ Stage implementation and some simple stages.
 
 import time
 import math
+import collections
 from abc import ABC,abstractmethod
 
 from frame import Frame
+
+class Linear_pipeline:
+    def __init__(self, stages:list):
+        self.head = stages[0]
+        for i in range(len(stages)-1):
+            Connect( stages[i], stages[i+1] )
+    def start(self, f):
+        """Run a frame through the pipeline. This interface will be moved entirely into the pipeline"""
+        self.head._start(f)
 
 
 class Stage(ABC):
@@ -22,13 +32,13 @@ class Stage(ABC):
         self.sum_t2  = 0
         self.count   = 0
         self.registered_stages.append(self)
-        self.queued_output_frames = []
+        self.queued_output_stage_frame_pairs = collections.deque()
 
     @abstractmethod
     def process(self, frame:Frame):
         """Called to process"""
 
-    def start(self,f):
+    def _start(self,f):
         """called at the start of processing of this stage.
         Processes and then passes the frame to the output stages."""
         t0 = time.time()
@@ -38,16 +48,19 @@ class Stage(ABC):
         self.sum_t2 += (t*t)
         self.count  += 1
 
-        # Now pass to the next (could this be done with async functions?)
-        for f in self.queued_output_frames:
-            for obj in self.next_stages:
-                obj.start(f)
-        self.queued_output_frames.clear()
-
+        # Now pass to the next. This logic needs to be moved into the linear pipeline and have the output function store
+        # (s,f) pairs.
+        while True:
+            try:
+                (s,f) = self.queued_output_stage_frame_pairs.pop()
+            except IndexError:
+                break
+            s._start(f)
 
     def output(self,f):
         """output(f) queues f for output when the current stage is done."""
-        self.queued_output_frames.append(f)
+        for s in self.next_stages:
+            self.queued_output_stage_frame_pairs.append( (s,f) )
 
     @property
     def t_mean(self):
@@ -97,9 +110,3 @@ class Multiplex(Stage):
 def Connect(prev_:Stage, next_:Stage):
     """Make the output of stage prev_ go to next_"""
     prev_.next_stages.add(next_)
-
-def Linear_pipeline(stages):
-    """Make a linear pipeline"""
-    for i in range(len(stages)-1):
-        Connect( stages[i], stages[i+1] )
-    return stages[0]            # start of pipeline
