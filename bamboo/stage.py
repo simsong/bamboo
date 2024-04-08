@@ -2,7 +2,6 @@
 Stage implementation and some simple stages.
 """
 
-
 import os
 import time
 import math
@@ -10,48 +9,6 @@ import collections
 from abc import ABC,abstractmethod
 
 from .frame import Frame
-
-class Pipeline(ABC):
-    """Base pipeline class"""
-    def __init__(self):
-        self.queued_output_stage_frame_pairs = collections.deque()
-        self.head = None
-
-    def queue_output_stage_frame_pair(self, pair):
-        self.queued_output_stage_frame_pairs.append(pair)
-
-    def addLinearPipeline(self, stages:list):
-        self.head = stages[0]
-        for i in range(len(stages)-1):
-            stages[i].pipeline = self
-            stages[i+1].pipeline = self
-            Connect( stages[i], stages[i+1] )
-        return (stages[0],stages[-1])
-
-    def process(self, f):
-        """Run a frame through the pipeline. This interface will be moved entirely into the pipeline"""
-        self.queue_output_stage_frame_pair( (self.head, f))
-        self.run_queue()
-
-    def process_list(self, flist):
-        for f in flist:
-            self.process(f)
-
-class SingleThreadedPipeline(Pipeline):
-    """Runs the pipeline in the caller's thread"""
-    def __init__(self):
-        super().__init__()
-
-    def run_queue(self):
-        # Now pass to the next. This logic needs to be moved into the linear pipeline and have the output function store
-        # (s,f) pairs.
-        while True:
-            try:
-                (s,f) = self.queued_output_stage_frame_pairs.popleft()
-            except IndexError:
-                break
-            print(s,f)
-            s._run_frame(f)
 
 class Stage(ABC):
     """Abstract base class for processing DAG"""
@@ -90,14 +47,14 @@ class Stage(ABC):
 
     @property
     def t_mean(self):
-        return self.sum_t / self.count
+        return self.sum_t / self.count if self.count>0 else float("nan")
 
     @property
     def t2_mean(self):
-        return self.sum_t2 / self.count
+        return self.sum_t2 / self.count if self.count>0 else float("nan")
 
     @property
-    def t_variance():
+    def t_variance(self):
         return self.t2_mean - self.t_mean * self.t_mean
 
     @property
@@ -115,6 +72,7 @@ class ShowFrames(Stage):
     def process(self, f:Frame):
         f.show(title=f.src, wait=self.wait)
         self.output(f)
+
 
 class ShowTags(Stage):
     """Pipeline that shows the tags for every frame that has a tag, and then copy to output"""
@@ -142,7 +100,6 @@ class WriteToDirectory(Stage):
     def process(self, f:Frame):
         fname = os.path.join(self.root, self.template.format(counter=self.counter))
         f.save(fname)
-        if self.counter==22: abort()
         self.counter += 1
 
 

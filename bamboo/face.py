@@ -5,8 +5,8 @@ A number of stages that work with frames that are tagged with faces.
 from .frame import Frame,FACE,Tag
 from .stage import Stage
 
-class ExtractFaces(Stage):
-    """pull faces out of the pipeline and pass them on"""
+class ExtractFacesToFrames(Stage):
+    """Turn each tagged into a frame and pass the frame down the pipeline."""
     scale = 1.0
     def __init__(self, scale=1.0):
         """:param scale: allows a region larger than the recognized face to be selected."""

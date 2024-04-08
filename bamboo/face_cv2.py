@@ -3,8 +3,8 @@ Stage for facedetect using cv2
 """
 
 import os
-from frame import Frame,Tag,FACE
-from stage import Stage
+from .frame import Frame,Tag,FACE
+from .stage import Stage
 import cv2
 
 class OpenCVFaceDetector(Stage):

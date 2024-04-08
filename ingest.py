@@ -20,7 +20,7 @@ import yaml
 import cv2
 from lib.ctools.timer import Timer
 from constants import C
-from frame import Frame,FrameArray
+from frame import Frame
 
 # We use the cache to avoid making the same directory twice
 @functools.lru_cache(maxsize=128)
@@ -56,6 +56,33 @@ def s3_client():
     return boto3.session.Session().client( 's3' )
 def s3_resource():
     return boto3.Session().resource( 's3' )
+
+class FrameArray(list):
+    """Array of frames"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(self, *args, **kwargs)
+        self.sorted = False
+
+    def add(self, item):
+        self.append(item)
+        self.sorted = False
+
+    def sort(self):
+        if not self.sorted:
+            super().sort()
+            self.sorted=True
+
+    def firstn(self, n):
+        self.sort()
+        return self[0:n]
+
+    def lastn(self, n):
+        self.sort()
+        return sorted(self[-n:], reverse=True)
+
+    def first(self):
+        return self.firstn(1)[0]
+
 
 class IngestCamera():
     """Master class for camera ingester"""

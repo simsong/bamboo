@@ -1,11 +1,15 @@
-"""
-This module provides the following classes:
+"""This module provides the following classes:
+
+Patch - Describes a particular rectangular patch of a frame.
+
+Frame - Holds individual frames and logic for working on individual frames with OpenCV.
+FrameArray - An array of frames
 
 Tag - For adding (k,v) tags to Frames. The "v" is an arbitrary python value or object.
-Frame - Holds individual frames and logic for working on individual frames with OpenCV.
-Frame.FrameStream(root) - A generator of frames from a root
-Frame.DissimilarFrameStream(root, score=0.90) - Generates a stream of frames that have a similarity score less than socre
 
+Frames based on disk files are cached in memory with an LRU
+cache. This allows millions of frames to be kept in memory using only
+megabytes rather than terabytes of RAM.
 
 """
 import os
@@ -21,28 +25,37 @@ import hashlib
 from .constants import C
 from .image_utils import img_sim
 
+MAXSIZE_CACHE=128
+
+FACE='face'
+PT1 = 'pt1'
+PT2 = 'pt2'
+TEXT = 'text'
+
+
+
 ## several functions for reading images. All cache.
 ## This allows us to just pass around the path and read the bytes or the cv2 image rapidly from the cache
 
-@functools.lru_cache(maxsize=128)
+@functools.lru_cache(maxsize=MAXSIZE_CACHE)
 def bytes_read(path):
     with open(path,"rb") as f:
         return f.read()
 
-@functools.lru_cache(maxsize=128)
+@functools.lru_cache(maxsize=MAXSIZE_CACHE)
 def hash_read(path):
     """Return the first 256 bits of a SHA-512 hash. We do this because SHA-512 is faster than SHA-256"""
     return "SHA-512/256:" + hashlib.sha512(bytes_read(path)).digest()[:32].hex()
 
 
-@functools.lru_cache(maxsize=128)
+@functools.lru_cache(maxsize=MAXSIZE_CACHE)
 def image_read(path):
     """Caching image read. We cache to minimize what's stored in memory. We make it immutable to allow sharing"""
     img = cv2.imdecode(np.frombuffer( bytes_read(path), np.uint8), cv2.IMREAD_ANYCOLOR)
     img.flags.writeable = False
     return img
 
-@functools.lru_cache(maxsize=128)
+@functools.lru_cache(maxsize=MAXSIZE_CACHE)
 def image_grayscale(path):
     """Caching image bw. We cache to minimize what's stored in memory"""
     img = cv2.cvtColor(image_read(path), cv2.COLOR_BGR2GRAY)
@@ -55,26 +68,12 @@ def similarity_for_two(t):
     return (t[0],t[1],img_sim(t[2],t[3]).score)
 
 
-FACE='face'
-PT1 = 'pt1'
-PT2 = 'pt2'
-TEXT = 'text'
-
-class Tag:
-    def __init__(self, *args, **kwargs):
-        if len(args)==1:
-            self.type = args[0]
-        for (k,v) in kwargs.items():
-            setattr(self, k, v)
-    def __repr__(self):
-        return f"<TAG {self.type} {json.dumps(self.__dict__,default=str)}>"
-
-
 class Frame:
-    """Abstraction to hold an image frame. If a stage modifies a Frame, it needs to make a copy first."""
-    def __init__(self, *, path=None):
+    """Abstraction to hold an image frame.
+    If a stage modifies a Frame, it needs to make a copy first."""
+    def __init__(self, *, path=None, img=None, src=None, mime_type=None):
         self.path = path
-        self.src  = path
+        self.src  = src
         self.tags = []
         self.tags_added = 0
         # These are for overriding the properties
@@ -83,12 +82,16 @@ class Frame:
         self.depth_ = None
         self.bytes_ = None
         self.img_   = None
-        # Read the timestamp from the filename if present, otherwise gram from mtime
-        try:
-            self.mtime = datetime.fromisoformat( os.path.splitext(os.path.basename(path))[0] )
-        except ValueError:
-            self.mtime = datetime.fromtimestamp(os.path.getmtime(path))
-        except TypeError:
+        self.mime_type_ = mime_type
+
+        # Set the timestamp
+        if path is not None:
+            self.src = path
+            try:
+                self.mtime = datetime.fromisoformat( os.path.splitext(os.path.basename(path))[0] )
+            except ValueError:
+                self.mtime = datetime.fromtimestamp(os.path.getmtime(path))
+        elif img is not None:
             self.mtime = datetime.now()
 
     def __lt__(self, b):
@@ -150,32 +153,6 @@ class Frame:
                 self.annotate( i, tag.pt1, tag.pt2, text=tag.text)
         self.show(i=i, title=title, wait=wait)
 
-    @classmethod
-    def FrameStream(cls, root):
-        """Generator for a series of Frame() objects. Returns frames in sort order within each directory"""
-        if os.path.isdir(root):
-            for (dirpath, dirnames, filenames) in os.walk(root): # pylint: disable=unused-variable
-                dirnames.sort()                                  # makes the directories recurse in sort order
-                for fname in sorted(filenames):
-                    if os.path.splitext(fname)[1].lower() in C.IMAGE_EXTENSIONS:
-                        path = os.path.join(dirpath, fname)
-                        if os.path.getsize(path)>0:
-                            yield Frame(path=path)
-        else:
-            yield Frame(path=root)
-
-    @classmethod
-    def DissimilarFrameStream(cls, root, score=0.90):
-        ref = None
-        for f in self.FrameStream(root):
-            try:
-                score = f.similarity(ref)
-            except cv2.error as e: # pylint: disable=catching-non-exception
-                print(f"Error {e} with {i.path}",file=sys.stderr)
-                continue
-            if score <= self.sim_threshold:
-                yield f
-                ref = f
     @property
     def img(self):
         """return an opencv image object that is not writable."""
@@ -232,28 +209,31 @@ class CroppedFrame(Frame):
         self.bytes_ = self.img_.tobytes()
 
 
-class FrameArray(list):
-    """Array of frames"""
+class Patch:
+    def __init__(self, *, pt1, pt2=None, w=None, h=None):
+        if w is None and h is not None:
+            raise ValueError("If h is provided, w must be provided")
+        if h is None and w is not None:
+            raise ValueError("If w is provided, h must be provided")
+        if pt2 is None and w is None:
+            raise ValueError("Either pt2 or w must be provided")
+        if pt2 is not None and w is not None:
+            raise ValueError("Both pt2 and w may not be provided.")
+        self.pt1 = pt1
+        if pt2 is not None:
+            self.pt2 = pt2
+            self.w = pt2[0] - pt2[0]
+            self.h = pt2[1] - pt1[1]
+        else:
+            self.w = w
+            self.h = h
+            self.pt2 = (pt0[0]+w, pt0[0]+h)
+
+class Tag:
     def __init__(self, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
-        self.sorted = False
-
-    def add(self, item):
-        self.append(item)
-        self.sorted = False
-
-    def sort(self):
-        if not self.sorted:
-            super().sort()
-            self.sorted=True
-
-    def firstn(self, n):
-        self.sort()
-        return self[0:n]
-
-    def lastn(self, n):
-        self.sort()
-        return sorted(self[-n:], reverse=True)
-
-    def first(self):
-        return self.firstn(1)[0]
+        if len(args)==1:
+            self.type = args[0]
+        for (k,v) in kwargs.items():
+            setattr(self, k, v)
+    def __repr__(self):
+        return f"<TAG {self.type} {json.dumps(self.__dict__,default=str)}>"

@@ -1,5 +1,16 @@
-# Bamboo DVR
-Bamboom DVR is a smart digital video archiving and analysis platform.
+# Bamboo
+Bamboo is a python module for building production-quality research pipelines for processing video and stillframe images.
+
+## Features
+
+* Visually compare the results of face-detection or object-classification algorithms.
+* Do the same comparision methodologically over a million images, storing the results in a structured database.
+* Use the same pipeline to process from a disk directory, a video file, an RTSP camera stream, or JPEGs on-demand as they are loaded into an Amazon S3 bucket.
+* Debug pipelines on your laptop in an easy-to-use single-threaded environment, then deploy them on a laptop or workstation with a multi-thread server, on a cluster of high-performance servers, or in a serverless cloud environment using Amazon Lambda.
+* Provides an easy-to-program object-oriented abstraction layer that easily wraps existing computer vision systems including OpenCV, YOLOv8 and Amazon Rekognition.
+
+## Demo programs provided with Bamboo
+
 
 # Goals
 
@@ -122,3 +133,6 @@ Do we want to have an abstract pipeline object?
 
 # To check out
 - [ ] https://docs.nvidia.com/tao/tao-toolkit-archive/5.2.0/text/visual_changenet/visual_changenet_segment.html
+
+# See Also
+* https://universe.roboflow.com/ - "The world's largest collection of open source computer vision datasets and APIs." (Unfortunately, no consistent API).

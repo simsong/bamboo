@@ -12,14 +12,11 @@ import copy
 
 from filelock import FileLock
 
-
 import boto3
 
-import filelock
-
-from bamboo.frame import Frame,Tag,FACE
-from bamboo.stage import Stage,SingleThreadedPipeline,ShowTags,ShowFrames
-from bamboo.face import ExtractFaces
+from .frame import Frame,Tag,FACE
+from .stage import Stage,SingleThreadedPipeline,ShowTags,ShowFrames
+from .face import ExtractFaces
 
 ARCHIVE_PATH = join(os.environ["HOME"],'.rekognition-cache')
 ARCHIVE_LOCK = ARCHIVE_PATH + ".lock"
@@ -71,6 +68,7 @@ class RekognitionFaceDetect(Stage):
 
 
 if __name__ == '__main__':
+    """A little test program"""
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('image', type=str, help="image path")

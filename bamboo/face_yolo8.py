@@ -1,6 +1,9 @@
 """
 From https://github.com/hpc203/yolov8-face-landmarks-opencv-dnn.
 Cleaned up, translated to English from Chinese, and made a module for Bamboo pipline
+
+Also see:
+https://yolov8.org/yolov8-face-detection/
 """
 
 import cv2
@@ -8,8 +11,8 @@ import numpy as np
 import math
 import argparse
 
-from bamboo.stage import Stage
-from bamboo.frame import Frame,Tag,FACE
+from .stage import Stage
+from .frame import Frame,Tag,FACE
 
 CONF_THRESHOLD = 0.45
 NMS_THRESHOLD = 0.50
@@ -194,6 +197,7 @@ class Yolo8FaceDetect(Stage):
         self.output(f)
 
 if __name__ == '__main__':
+    "A little test program"
     parser = argparse.ArgumentParser()
     parser.add_argument('image', type=str, help="image path")
     parser.add_argument('--confThreshold', default=CONF_THRESHOLD, type=float, help='class confidence')
