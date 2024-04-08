@@ -13,6 +13,9 @@ DeepFace.find(img_path=path, db_path="faces", model_name, enforce_detection=Fals
 
 Note: paths can all be str or np.ndarray in BGR format, or base64 encoded image. "If the source image contains multiple faces, the result will include information for each detected face."
 
+Note: It may be necessary to download:
+https://github.com/serengil/deepface_models/releases/download/v1.0/vgg_face_weights.h5
+
 """
 
 from deepface import DeepFace
@@ -21,17 +24,47 @@ import cv2
 import numpy as np
 import math
 import argparse
+import re
+from os.path import join, abspath, basename, dirname
 
-from bamboo.stage import Stage
-from bamboo.frame import Frame,Tag,FACE
 
-CONF_THRESHOLD = 0.45
-NMS_THRESHOLD = 0.50
+from .stage import Stage
+from .frame import Frame,Tag,FACE
 
-class Yolo8FaceDetect(Stage):
-    # Initialize YOLOv8_face object detector
-    face_detector = YOLOv8_face("etc/yolov8/yolov8n-face.onnx", conf_thres=CONF_THRESHOLD, iou_thres=NMS_THRESHOLD)
-    fqa = FaceQualityAssessment("etc/yolov8/face-quality-assessment.onnx")
+import deepface.modules
+import deepface.detectors
+
+# Surprisingly, the list of models is not available in DeepFace; we need to read it from the source code. Ick
+
+def deepface_model_names():
+    ret = set()
+    pat = re.compile('.*"([-a-zA-Z0-9]+)": .*Client,')
+    with open(join(dirname(deepface.modules.__file__),"modeling.py")) as f:
+        for line in f:
+            m = pat.search(line)
+            if m:
+                ret.add(m.group(1))
+    return ret
+
+def deepface_detector_names():
+    ret = set()
+    pat = re.compile('.*"([-a-zA-Z0-9]+)": .*Client,')
+    with open(join(dirname(deepface.detectors.__file__),"DetectorWrapper.py")) as f:
+        for line in f:
+            m = pat.search(line)
+            if m:
+                ret.add(m.group(1))
+    return ret
+
+
+
+
+
+class DeepFaceTag(Stage):
+    def __init__(self, embeddings=True, attributes=True, detector_backend='opencv'):
+        self.embeddings = embeddings
+        self.attributes = attributes
+
 
     def process(self, f:Frame):
         # Detect Objects
@@ -46,6 +79,7 @@ class Yolo8FaceDetect(Stage):
             f.add_tag(Tag(FACE, pt1=(x,y), pt2=(x+w,y+h), fqa = fqa_prob_mean,
                           text=f"fqa_score {fqa_prob_mean:4.2f}"))
         self.output(f)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

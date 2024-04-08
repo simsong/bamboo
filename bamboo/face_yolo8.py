@@ -16,6 +16,8 @@ from .frame import Frame,Tag,FACE
 
 CONF_THRESHOLD = 0.45
 NMS_THRESHOLD = 0.50
+YOLO8N_FACE_PATH = join( MYDIR, "etc/yolov8/yolov8n-face.onnx")
+YOLO8N_QUALITY_ASSESSMENT = join( MYDIR, "etc/yolov8/face-quality-assessment.onnx")
 
 class YOLOv8_face:
     def __init__(self, onnx_path, conf_thres=0.2, iou_thres=0.5):
@@ -179,8 +181,11 @@ class FaceQualityAssessment():
 
 class Yolo8FaceDetect(Stage):
     # Initialize YOLOv8_face object detector
-    face_detector = YOLOv8_face("etc/yolov8/yolov8n-face.onnx", conf_thres=CONF_THRESHOLD, iou_thres=NMS_THRESHOLD)
-    fqa = FaceQualityAssessment("etc/yolov8/face-quality-assessment.onnx")
+
+    face_detector = YOLOv8_face(YOLO8N_FACE_PATH,
+                                conf_thres=CONF_THRESHOLD,
+                                iou_thres=NMS_THRESHOLD)
+    fqa = FaceQualityAssessment(YOLO8N_QUALITY_ASSESSMENT)
 
     def process(self, f:Frame):
         # Detect Objects
