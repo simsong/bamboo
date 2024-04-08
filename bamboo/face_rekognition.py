@@ -14,9 +14,11 @@ from filelock import FileLock
 
 import boto3
 
+from .stage import Stage,ShowTags,ShowFrames
+from .face import ExtractFacesToFrames
 from .frame import Frame,Tag,FACE
-from .stage import Stage,SingleThreadedPipeline,ShowTags,ShowFrames
-from .face import ExtractFaces
+from .pipeline import SingleThreadedPipeline
+from .source import FrameStream
 
 ARCHIVE_PATH = join(os.environ["HOME"],'.rekognition-cache')
 ARCHIVE_LOCK = ARCHIVE_PATH + ".lock"
@@ -39,27 +41,29 @@ class RekognitionFaceDetect(Stage):
     profile_name=DEFAULT_PROFILE
 
     def process(self, f:Frame):
-        f = f.copy()            # we will be adding tags
+        # we will be adding tags, so make a copy of this frame.
         try:
             faceDetails = get_info(f)
         except KeyError:
             session = boto3.Session(profile_name=self.profile_name, region_name=self.region_name)
             client = session.client('rekognition', region_name=self.region_name)
-            response = client.detect_faces(Image={'Bytes':f.bytes},
-                                           Attributes=['ALL'])
+            bytes = f.bytes
+            print("BYTES len()=",len(bytes))
+            response = client.detect_faces(Image={'Bytes':f.bytes}, Attributes=['ALL'])
             faceDetails = response['FaceDetails']
             save_info(f, faceDetails)
 
-        for fd in faceDetails:
+        for (ct,fd) in enumerate(faceDetails):
+            if ct==0:
+                f = f.copy()
             top_left = (int(fd['BoundingBox']['Left'] * f.width),
                         int(fd['BoundingBox']['Top'] * f.height))
-            face_width = int(fd['BoundingBox']['Width']*f.width)
-            face_height = int(fd['BoundingBox']['Height']*f.height)
-            bot_right = (top_left[0] + face_width, top_left[1] + face_height)
+            w  = int(fd['BoundingBox']['Width']*f.width)
+            h = int(fd['BoundingBox']['Height']*f.height)
 
             f.add_tag( Tag( FACE,
                             pt1 = top_left,
-                            pt2 = bot_right,
+                            w=w, h=h,
                             text = "aws face",
                             faceDetails = fd))
         self.output(f)
@@ -76,7 +80,8 @@ if __name__ == '__main__':
 
     # Create a 4-step pipeline to recognize the face, show the tags, extract the faces, and show each
     p = SingleThreadedPipeline()
-    p.addLinearPipeline([ RekognitionFaceDetect(), ShowTags(wait=0), ExtractFaces(scale=1.3), ShowFrames(wait=0) ])
-    f = Frame(path=args.image)
-    p.process(f)
-    print(f.tags)
+    p.addLinearPipeline([ RekognitionFaceDetect(),
+                          ShowTags(wait=0),
+                          ExtractFacesToFrames(scale=1.3),
+                          ShowFrames(wait=0) ])
+    p.process_stream(  FrameStream(root=args.image))

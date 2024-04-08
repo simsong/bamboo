@@ -13,3 +13,7 @@ def test_finders():
     detector_names = face_deepface.deepface_detector_names()
     assert 'dlib' in detector_names
     assert len(detector_names)>=7
+
+    normalization_names = face_deepface.deepface_normalization_names()
+    assert 'Facenet2018' in normalization_names
+    assert len(normalization_names)>=7

@@ -39,6 +39,7 @@ TEXT = 'text'
 
 @functools.lru_cache(maxsize=MAXSIZE_CACHE)
 def bytes_read(path):
+    """Returns the file, which is compressed as a JPEG"""
     with open(path,"rb") as f:
         return f.read()
 
@@ -165,7 +166,10 @@ class Frame:
 
     @property
     def bytes(self):
-        return self.img.tobytes()
+        """Returns as disk bytes or, if there are none, as a JPEG compressed"""
+        if self.path is not None:
+            return bytes_read(self.path)
+        return cv.imencode('.jpg', self.img_, [cv2.IMWRITE_JPEG_QUALITY, 90])[1]
 
     @property
     @functools.lru_cache(maxsize=3)
@@ -206,34 +210,42 @@ class CroppedFrame(Frame):
         self.width_ = max_x - min_x
         self.height_ = max_y - min_y
         self.img_ = np.copy(src.img[min_y:max_y, min_x:max_x])
-        self.bytes_ = self.img_.tobytes()
-
-
-class Patch:
-    def __init__(self, *, pt1, pt2=None, w=None, h=None):
-        if w is None and h is not None:
-            raise ValueError("If h is provided, w must be provided")
-        if h is None and w is not None:
-            raise ValueError("If w is provided, h must be provided")
-        if pt2 is None and w is None:
-            raise ValueError("Either pt2 or w must be provided")
-        if pt2 is not None and w is not None:
-            raise ValueError("Both pt2 and w may not be provided.")
-        self.pt1 = pt1
-        if pt2 is not None:
-            self.pt2 = pt2
-            self.w = pt2[0] - pt2[0]
-            self.h = pt2[1] - pt1[1]
-        else:
-            self.w = w
-            self.h = h
-            self.pt2 = (pt0[0]+w, pt0[0]+h)
 
 class Tag:
     def __init__(self, *args, **kwargs):
+        self.text = ""
+        self.pt2_ = None
+        self.w_   = None
+        self.h_   = None
         if len(args)==1:
             self.type = args[0]
         for (k,v) in kwargs.items():
-            setattr(self, k, v)
+            if k=='pt2':
+                self.pt2_ = v
+            elif k=='w':
+                self.w_ = v
+            elif k=='h':
+                self.h_ = v
+            else:
+                setattr(self, k, v)
+
+    @property
+    def pt2(self):
+        if self.pt2_ is not None:
+            return self.pt2_
+        if self.w_ is None or self.h_ is None:
+            raise AttributeError(".pt2 requested but neither .pt2 nor .w and .h are set")
+        return (self.pt1[0] + self.w_, self.pt1[0]+self.h_)
+
+    def w(self):
+        if self.w_ is not None:
+            return self.w_
+        return self.pt2[0]-self.pt1[0]
+
+    def h(self):
+        if self.h_ is not None:
+            return self.h_
+        return self.pt2[0]-self.pt1[0]
+
     def __repr__(self):
         return f"<TAG {self.type} {json.dumps(self.__dict__,default=str)}>"

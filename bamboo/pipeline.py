@@ -42,9 +42,14 @@ class Pipeline(ABC):
         for f in flist:
             self.process(f)
 
+    def process_stream(self, fstream):
+        for f in fstream:
+            self.process(f)
+
     def print_stats(self, out=sys.stdout):
         for stage in self.stages:
-            print(f"{stage}: calls: {stage.count}  mean: {stage.t_mean}s  stddev: {stage.t_stddev}", file=out)
+            name = stage.__class__.__name__
+            print(f"{name}: calls: {stage.count}  mean: {stage.t_mean}s  stddev: {stage.t_stddev}", file=out)
 
 
 class SingleThreadedPipeline(Pipeline):

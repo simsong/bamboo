@@ -27,10 +27,11 @@ import argparse
 import re
 from os.path import join, abspath, basename, dirname
 
-
-from .stage import Stage
+from .stage import Stage,ShowTags,ShowFrames
 from .frame import Frame,Tag,FACE
-
+from .pipeline import SingleThreadedPipeline
+from .face import ExtractFacesToFrames
+from .source import FrameStream
 import deepface.modules
 import deepface.detectors
 
@@ -56,40 +57,66 @@ def deepface_detector_names():
                 ret.add(m.group(1))
     return ret
 
-
+def deepface_normalization_names():
+    ret = set()
+    pat = re.compile('.*normalization == "([a-zA-Z0-9]+)"')
+    with open(join(dirname(deepface.modules.__file__),"preprocessing.py")) as f:
+        for line in f:
+            m = pat.search(line)
+            if m:
+                ret.add(m.group(1))
+    return ret
 
 
 
 class DeepFaceTag(Stage):
-    def __init__(self, embeddings=True, attributes=True, detector_backend='opencv'):
+    def __init__(self, embeddings=True, attributes=True,
+                 model_name = 'VGG-Face',
+                 detector_backend='opencv',
+                 normalization='base',
+                 scale=1.0):
+        super().__init__()
+        assert model_name in deepface_model_names()
+        assert detector_backend in deepface_detector_names()
+        assert normalization in deepface_normalization_names()
+
         self.embeddings = embeddings
         self.attributes = attributes
-
+        self.model_name = model_name
+        self.detector_backend = detector_backend
+        self.normalization = normalization
+        self.scale       = scale
 
     def process(self, f:Frame):
         # Detect Objects
         f = f.copy()            # we will be adding tags
-        boxes, scores, classids, kpts = self.face_detector.detect(f.img)
-        for i, box in enumerate(boxes):
-            x, y, w, h = box.astype(int)
-            crop_img = f.img[y:y + h, x:x + w]  # crop - can also be done after facial alignment
-            fqa_probs = self.fqa.detect(crop_img)    # get the face quality
-            fqa_prob_mean = round(np.mean(fqa_probs), 2)
+        expand_percentage = (self.scale - 1.0) * 100
+        if self.embeddings or self.attributes:
+            for found in deepface.DeepFace.represent(f.img,
+                                                     model_name = self.model_name,
+                                                     enforce_detection = False,
+                                                     detector_backend = self.detector_backend,
+                                                     align = True,
+                                                     expand_percentage = expand_percentage,
+                                                     normalization = self.normalization ):
 
-            f.add_tag(Tag(FACE, pt1=(x,y), pt2=(x+w,y+h), fqa = fqa_prob_mean,
-                          text=f"fqa_score {fqa_prob_mean:4.2f}"))
+                facial_area = found['facial_area']
+                f.add_tag(Tag(FACE,
+                              pt1=(facial_area['x'],facial_area['y']),
+                              w=facial_area['w'],
+                              h=facial_area['h'],
+                              **found))
         self.output(f)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('image', type=str, help="image path")
-    parser.add_argument('--confThreshold', default=CONF_THRESHOLD, type=float, help='class confidence')
-    parser.add_argument('--nmsThreshold', default=NMS_THRESHOLD, type=float, help='nms iou thresh')
     args = parser.parse_args()
 
     p = SingleThreadedPipeline()
-    p.addLinearPipeline([ Yolo8FaceDetect(), ShowTags(wait=0), ExtractFaces(scale=1.3), ShowFrames(wait=0) ])
-    f = Frame(path=args.image)
-    p.process(f)
-    print(f.tags)
+    p.addLinearPipeline([ DeepFaceTag(detector_backend='yolov8'),
+                          ShowTags(wait=0),
+                          ExtractFacesToFrames(scale=1.3),
+                          ShowFrames(wait=0) ])
+    p.process_stream(  FrameStream(root=args.image))

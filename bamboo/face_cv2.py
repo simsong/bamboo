@@ -3,7 +3,7 @@ Stage for facedetect using cv2
 """
 
 import os
-from .frame import Frame,Tag,FACE
+from .frame import Frame,Patch,Tag,FACE
 from .stage import Stage
 import cv2
 
@@ -23,25 +23,26 @@ class OpenCVFaceDetector(Stage):
     profile_cascade = cv2.CascadeClassifier( cv2_cascade('haarcascade_profileface.xml'))
 
     def process(self, f:Frame):
-        f = f.copy()            # we will be adding tags
-        front_faces = self.frontal_face_cascade.detectMultiScale(f.img_grayscale,
-                                                                 scaleFactor=1.1,
-                                                                 minNeighbors=10,
-                                                                 minSize=(40,40),
-                                                                 flags=cv2.CASCADE_SCALE_IMAGE)
+        # we will be adding tags, so make a copy of the frame.
+        # We then output the tagged frame.
+        f = f.copy()
+        front_faces = self.frontal_face_cascade.detectMultiScale(
+            f.img_grayscale, scaleFactor=1.1, minNeighbors=10,
+            minSize=(40,40), flags=cv2.CASCADE_SCALE_IMAGE)
+
         for (x,y,w,h) in front_faces:
             f.add_tag(Tag( FACE,
-                               pt1 = (x,y),
-                               pt2 = (x+w,y+h),
-                               text = "cv2 frontal_face"))
+                           patch = Patch(pt1 = (x,y), w=w, h=h),
+                           text = "cv2 frontal_face"))
 
         profile_faces = self.profile_cascade.detectMultiScale(
             f.img_grayscale, scaleFactor=1.1, minNeighbors=10,
-            minSize=(40,40),
-            flags=cv2.CASCADE_SCALE_IMAGE)
+            minSize=(40,40), flags=cv2.CASCADE_SCALE_IMAGE)
 
         for (x,y,w,h) in profile_faces:
-            f.add_tag(Tag(FACE, pt1=(x,y),pt2=(x+w,y+h), text="cv2 profile_face"))
+            f.add_tag(Tag(FACE,
+                          patch = Patch(pt1=(x,y), w=w, h=h),
+                          text="cv2 profile_face"))
 
         self.output(f)
 

@@ -7,9 +7,12 @@ Bamboo is a python module for building production-quality research pipelines for
 * Do the same comparision methodologically over a million images, storing the results in a structured database.
 * Use the same pipeline to process from a disk directory, a video file, an RTSP camera stream, or JPEGs on-demand as they are loaded into an Amazon S3 bucket.
 * Debug pipelines on your laptop in an easy-to-use single-threaded environment, then deploy them on a laptop or workstation with a multi-thread server, on a cluster of high-performance servers, or in a serverless cloud environment using Amazon Lambda.
-* Provides an easy-to-program object-oriented abstraction layer that easily wraps existing computer vision systems including OpenCV, YOLOv8 and Amazon Rekognition.
+* Provides a consistent, easy-to-program object-oriented abstraction layer that easily wraps existing computer vision systems including OpenCV, YOLOv8 and Amazon Rekognition.
 
 ## Demo programs provided with Bamboo
+
+## Terminology
+`scale` - the amount to expand a face area. scale=1.0 is default (no expansion)
 
 
 # Goals

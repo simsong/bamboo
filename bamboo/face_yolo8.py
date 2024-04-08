@@ -10,12 +10,17 @@ import cv2
 import numpy as np
 import math
 import argparse
+from os.path import join,dirname,abspath
 
-from .stage import Stage
+from .stage import Stage,ShowTags,ShowFrames
+from .face import ExtractFacesToFrames
 from .frame import Frame,Tag,FACE
+from .pipeline import SingleThreadedPipeline
+from .source import FrameStream
 
 CONF_THRESHOLD = 0.45
 NMS_THRESHOLD = 0.50
+MYDIR = dirname(abspath(__file__))
 YOLO8N_FACE_PATH = join( MYDIR, "etc/yolov8/yolov8n-face.onnx")
 YOLO8N_QUALITY_ASSESSMENT = join( MYDIR, "etc/yolov8/face-quality-assessment.onnx")
 
@@ -179,7 +184,7 @@ class FaceQualityAssessment():
         outputs = self.net.forward(self.net.getUnconnectedOutLayersNames())
         return outputs[0].reshape(-1)
 
-class Yolo8FaceDetect(Stage):
+class Yolo8FaceTag(Stage):
     # Initialize YOLOv8_face object detector
 
     face_detector = YOLOv8_face(YOLO8N_FACE_PATH,
@@ -189,7 +194,8 @@ class Yolo8FaceDetect(Stage):
 
     def process(self, f:Frame):
         # Detect Objects
-        f = f.copy()            # we will be adding tags
+        # we will be adding tags, so make a copy of this frame
+        f = f.copy()
         boxes, scores, classids, kpts = self.face_detector.detect(f.img)
         for i, box in enumerate(boxes):
             x, y, w, h = box.astype(int)
@@ -197,8 +203,10 @@ class Yolo8FaceDetect(Stage):
             fqa_probs = self.fqa.detect(crop_img)    # get the face quality
             fqa_prob_mean = round(np.mean(fqa_probs), 2)
 
-            f.add_tag(Tag(FACE, pt1=(x,y), pt2=(x+w,y+h), fqa = fqa_prob_mean,
+            f.add_tag(Tag(FACE,
+                          pt1=(x,y), w=w, h=h, fqa = fqa_prob_mean,
                           text=f"fqa_score {fqa_prob_mean:4.2f}"))
+        # output the copy
         self.output(f)
 
 if __name__ == '__main__':
@@ -210,7 +218,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     p = SingleThreadedPipeline()
-    p.addLinearPipeline([ Yolo8FaceDetect(), ShowTags(wait=0), ExtractFaces(scale=1.3), ShowFrames(wait=0) ])
-    f = Frame(path=args.image)
-    p.process(f)
-    print(f.tags)
+    p.addLinearPipeline([ Yolo8FaceTag(),
+                          ShowTags(wait=0),
+                          ExtractFacesToFrames(scale=1.3),
+                          ShowFrames(wait=0) ])
+    p.process_stream(  FrameStream(root=args.image))
