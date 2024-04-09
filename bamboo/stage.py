@@ -94,7 +94,7 @@ class Multiplex(Stage):
     def process(self, f:Frame):
         self.output(f)
 
-class WriteToDirectory(Stage):
+class WriteFramesToDirectory(Stage):
     def __init__(self, root, template):
         super().__init__()
         self.root = root
