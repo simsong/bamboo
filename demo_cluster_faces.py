@@ -43,5 +43,7 @@ if __name__=="__main__":
     with shelve.open(args.db, writeback=False) as db:
         for (k,v) in db.items():
             paths.append(v['path'])
+            paths.append(v['tag']['embedding'])
             if args.dump:
                 print("k=",k,"v=",v)
+    print("len(embeddings)=",len(embeddings))
