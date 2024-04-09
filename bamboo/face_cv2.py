@@ -3,7 +3,7 @@ Stage for facedetect using cv2
 """
 
 import os
-from .frame import Frame,Patch,Tag,FACE
+from .frame import Frame,Patch,Tag,TAG_FACE
 from .stage import Stage
 import cv2
 
@@ -31,7 +31,7 @@ class OpenCVFaceDetector(Stage):
             minSize=(40,40), flags=cv2.CASCADE_SCALE_IMAGE)
 
         for (x,y,w,h) in front_faces:
-            f.add_tag(Tag( FACE,
+            f.add_tag(Tag( TAG_FACE,
                            patch = Patch(pt1 = (x,y), w=w, h=h),
                            text = "cv2 frontal_face"))
 
@@ -40,7 +40,7 @@ class OpenCVFaceDetector(Stage):
             minSize=(40,40), flags=cv2.CASCADE_SCALE_IMAGE)
 
         for (x,y,w,h) in profile_faces:
-            f.add_tag(Tag(FACE,
+            f.add_tag(Tag(TAG_FACE,
                           patch = Patch(pt1=(x,y), w=w, h=h),
                           text="cv2 profile_face"))
 

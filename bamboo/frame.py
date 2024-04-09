@@ -29,12 +29,9 @@ from .image_utils import img_sim
 MAXSIZE_CACHE=128
 DEFAULT_JPEG_QUALITY = 90
 
-FACE='face'
-PT1 = 'pt1'
-PT2 = 'pt2'
-TEXT = 'text'
-
-
+TAG_FACE='face'
+TAG_FACE_COUNT='face_count'
+TAG_SKIPPED='skipped'
 
 ## several functions for reading images. All cache.
 ## This allows us to just pass around the path and read the bytes or the cv2 image rapidly from the cache
@@ -218,13 +215,12 @@ class CroppedFrame(Frame):
         self.img_ = np.copy(src.img[min_y:max_y, min_x:max_x])
 
 class Tag:
-    def __init__(self, *args, **kwargs):
+    def __init__(self, tag_type, **kwargs):
         self.text = ""
         self.pt2_ = None
         self.w_   = None
         self.h_   = None
-        if len(args)==1:
-            self.type = args[0]
+        self.tag_type = tag_type
         for (k,v) in kwargs.items():
             if k=='pt2':
                 self.pt2_ = v
@@ -254,4 +250,4 @@ class Tag:
         return self.pt2[0]-self.pt1[0]
 
     def __repr__(self):
-        return f"<TAG {self.type} {json.dumps(self.__dict__,default=str)}>"
+        return f"<TAG {self.tag_type} {json.dumps(self.__dict__,default=str)}>"

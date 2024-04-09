@@ -7,6 +7,7 @@ import time
 import math
 import collections
 import uuid
+import shelve
 from abc import ABC,abstractmethod
 from filelock import FileLock
 
@@ -109,21 +110,24 @@ class WriteToDirectory(Stage):
 class SaveTagsToShelf(Stage):
     def __init__(self, *, tagfilter=None, path):
         """Saves tags that pass tagfilter to the shelf, with locking"""
-        #super().__init__()
+        super().__init__()
         self.tagfilter = tagfilter
         self.path      = path
         self.lockfile  = path + ".lock"
 
     def process(self, f:Frame):
         if self.tagfilter is not None:
+            print("f.tags+",f.tags)
             tags = [tag for tag in f.tags if self.tagfilter(tag)]
         else:
             tags = f.tags
+        print("tags=",tags)
         if tags:
             with FileLock(self.lockfile) as lock:
                 with shelve.open(self.path,writeback=True) as db:
                     for tag in tags:
-                        db[uuid.uuid4()] = (f.path, f.src, tag)
+                        db[str(uuid.uuid4())] = (f.path, f.src, tag)
+                        print("saved!")
 
 def Connect(prev_:Stage, next_:Stage):
     """Make the output of stage prev_ go to next_"""

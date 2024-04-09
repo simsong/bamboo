@@ -16,7 +16,7 @@ import boto3
 
 from .stage import Stage,ShowTags,ShowFrames
 from .face import ExtractFacesToFrames
-from .frame import Frame,Tag,FACE
+from .frame import Frame,Tag,TAG_FACE
 from .pipeline import SingleThreadedPipeline
 from .source import FrameStream
 
@@ -61,7 +61,7 @@ class RekognitionFaceDetect(Stage):
             w  = int(fd['BoundingBox']['Width']*f.width)
             h = int(fd['BoundingBox']['Height']*f.height)
 
-            f.add_tag( Tag( FACE,
+            f.add_tag( Tag( TAG_FACE,
                             pt1 = top_left,
                             w=w, h=h,
                             text = "aws face",

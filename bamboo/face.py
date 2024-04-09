@@ -2,7 +2,7 @@
 A number of stages that work with frames that are tagged with faces.
 """
 
-from .frame import Frame,FACE,Tag
+from .frame import Frame,TAG_FACE,TAG_FACE_COUNT,Tag
 from .stage import Stage
 
 class ExtractFacesToFrames(Stage):
@@ -16,7 +16,7 @@ class ExtractFacesToFrames(Stage):
     def process(self, f:Frame):
         count = 0
         for t in f.tags:
-            if t.type==FACE:
+            if t.tag_type==TAG_FACE:
                 # Find the existing center, width and height
                 cx     = (t.pt2[0]+t.pt1[0])//2
                 cy     = (t.pt2[1]+t.pt1[1])//2
@@ -30,5 +30,5 @@ class ExtractFacesToFrames(Stage):
 
                 f2 = f.crop( pt1, pt2 )
                 count += 1
-                f2.add_tag(Tag('extract',extract_count=count))
+                f2.add_tag(t)   # add the tag! it has metadata
                 self.output( f2 )

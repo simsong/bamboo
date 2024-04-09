@@ -28,7 +28,7 @@ import re
 from os.path import join, abspath, basename, dirname
 
 from .stage import Stage,ShowTags,ShowFrames
-from .frame import Frame,Tag,FACE
+from .frame import Frame,Tag,TAG_FACE
 from .pipeline import SingleThreadedPipeline
 from .face import ExtractFacesToFrames
 from .source import FrameStream
@@ -101,7 +101,7 @@ class DeepFaceTag(Stage):
                                                      normalization = self.normalization ):
 
                 facial_area = found['facial_area']
-                f.add_tag(Tag(FACE,
+                f.add_tag(Tag(TAG_FACE,
                               pt1=(facial_area['x'],facial_area['y']),
                               w=facial_area['w'],
                               h=facial_area['h'],

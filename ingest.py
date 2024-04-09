@@ -20,7 +20,7 @@ import yaml
 import cv2
 from lib.ctools.timer import Timer
 
-from  bamboo.frame import Tag
+from  bamboo.frame import Tag,TAG_SKIPPED
 
 # We use the cache to avoid making the same directory twice
 @functools.lru_cache(maxsize=128)
@@ -153,7 +153,7 @@ class IngestCamera():
                     continue
                 if score > self.sim_threshold:
                     skipped += 1
-                    i.add_tag(Tag("skipped"))
+                    i.add_tag(Tag(TAG_SKIPPED))
                 else:
                     self.ingest_save_image(i)
                     ref = i
