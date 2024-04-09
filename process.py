@@ -2,14 +2,12 @@
 process frames that have been ingested.
 """
 
-import os
-import os.path
 
 import cv2
 from ingest import Frame
-from stage import Stage,ShowTags
-from facedetect_yolo8 import Yolo8FaceDetect
-from facedetect_cv2 import OpenCVFaceDetector
+from bamboo.stage import Stage,ShowTags
+from bamboo.facedetect_yolo8 import Yolo8FaceDetect
+from bamboo.facedetect_cv2 import OpenCVFaceDetector
 
 
 

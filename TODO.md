@@ -21,3 +21,4 @@ Ideas:
 * Show people in your google drive photos
 
 * source module - Frame, Root, Live Video, S3 bucket uploads, HTTP post, video to frames.
+* https://github.com/michaelben/OCR-handwriting-recognition-libraries

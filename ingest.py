@@ -19,8 +19,8 @@ import boto3
 import yaml
 import cv2
 from lib.ctools.timer import Timer
-from constants import C
-from frame import Frame
+
+from  bamboo.frame import Tag
 
 # We use the cache to avoid making the same directory twice
 @functools.lru_cache(maxsize=128)

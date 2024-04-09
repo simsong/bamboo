@@ -6,7 +6,9 @@ import os
 import time
 import math
 import collections
+import uuid
 from abc import ABC,abstractmethod
+from filelock import FileLock
 
 from .frame import Frame
 
@@ -99,13 +101,34 @@ class WriteToDirectory(Stage):
         self.template = template
     def process(self, f:Frame):
         fname = os.path.join(self.root, self.template.format(counter=self.counter))
+        print("==> write to",fname)
         f.save(fname)
         self.counter += 1
 
 
+class SaveTagsToShelf(Stage):
+    def __init__(self, *, tagfilter=None, path):
+        """Saves tags that pass tagfilter to the shelf, with locking"""
+        #super().__init__()
+        self.tagfilter = tagfilter
+        self.path      = path
+        self.lockfile  = path + ".lock"
 
-
+    def process(self, f:Frame):
+        if self.tagfilter is not None:
+            tags = [tag for tag in f.tags if self.tagfilter(tag)]
+        else:
+            tags = f.tags
+        if tags:
+            with FileLock(self.lockfile) as lock:
+                with shelve.open(self.path,writeback=True) as db:
+                    for tag in tags:
+                        db[uuid.uuid4()] = (f.path, f.src, tag)
 
 def Connect(prev_:Stage, next_:Stage):
     """Make the output of stage prev_ go to next_"""
+    if not hasattr(prev_,'count'):
+        raise RuntimeError(str(prev) + "did not call super().__init__()")
+    if not hasattr(next_,'count'):
+        raise RuntimeError(str(next_) + "did not call super().__init__()")
     prev_.next_stages.add(next_)

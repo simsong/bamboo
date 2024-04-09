@@ -17,6 +17,7 @@ import functools
 from datetime import datetime
 import json
 import copy
+import errno
 
 import cv2
 import numpy as np
@@ -26,6 +27,7 @@ from .constants import C
 from .image_utils import img_sim
 
 MAXSIZE_CACHE=128
+DEFAULT_JPEG_QUALITY = 90
 
 FACE='face'
 PT1 = 'pt1'
@@ -72,6 +74,7 @@ def similarity_for_two(t):
 class Frame:
     """Abstraction to hold an image frame.
     If a stage modifies a Frame, it needs to make a copy first."""
+    jpeg_quality = DEFAULT_JPEG_QUALITY
     def __init__(self, *, path=None, img=None, src=None, mime_type=None):
         self.path = path
         self.src  = src
@@ -101,7 +104,10 @@ class Frame:
         return f"<Frame path={self.path} src={self.src} tags={self.tags}>"
 
     def save(self, fname):
-        cv2.imwrite(fname, self.img)
+        r = cv2.imwrite(fname, self.img)
+        if r is False:
+            raise FileNotFoundError(f"could not write image: {fname}")
+
 
     def copy(self):
         """Returns a copy, but with the original img and tags. Setting a tag makes that copy.
@@ -169,7 +175,7 @@ class Frame:
         """Returns as disk bytes or, if there are none, as a JPEG compressed"""
         if self.path is not None:
             return bytes_read(self.path)
-        return cv.imencode('.jpg', self.img_, [cv2.IMWRITE_JPEG_QUALITY, 90])[1]
+        return cv.imencode('.jpg', self.img_, [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality])[1]
 
     @property
     @functools.lru_cache(maxsize=3)

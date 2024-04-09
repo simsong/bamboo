@@ -72,18 +72,18 @@ def deepface_normalization_names():
 class DeepFaceTag(Stage):
     def __init__(self, embeddings=True, attributes=True,
                  model_name = 'VGG-Face',
-                 detector_backend='opencv',
+                 face_detector='opencv',
                  normalization='base',
                  scale=1.0):
         super().__init__()
         assert model_name in deepface_model_names()
-        assert detector_backend in deepface_detector_names()
+        assert face_detector in deepface_detector_names()
         assert normalization in deepface_normalization_names()
 
         self.embeddings = embeddings
         self.attributes = attributes
         self.model_name = model_name
-        self.detector_backend = detector_backend
+        self.face_detector = face_detector
         self.normalization = normalization
         self.scale       = scale
 
@@ -95,7 +95,7 @@ class DeepFaceTag(Stage):
             for found in deepface.DeepFace.represent(f.img,
                                                      model_name = self.model_name,
                                                      enforce_detection = False,
-                                                     detector_backend = self.detector_backend,
+                                                     detector_backend = self.face_detector,
                                                      align = True,
                                                      expand_percentage = expand_percentage,
                                                      normalization = self.normalization ):

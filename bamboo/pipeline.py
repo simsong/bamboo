@@ -56,13 +56,14 @@ class SingleThreadedPipeline(Pipeline):
     """Runs the pipeline in the caller's thread. Print stats on exit"""
     def __init__(self, atExitStats=True, out=sys.stdout):
         super().__init__()
-        if atExitStats:
-            atexit.register(self.print_stats, out=out)
+        self.atExitStats=atExitStats
 
 
     def run_queue(self):
         # Now pass to the next. This logic needs to be moved into the linear pipeline and have the output function store
         # (s,f) pairs.
+        if self.atExitStats:
+            atexit.register(self.print_stats, out=out)
         while True:
             try:
                 (s,f) = self.queued_output_stage_frame_pairs.popleft()
