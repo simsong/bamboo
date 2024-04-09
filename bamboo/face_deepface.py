@@ -102,7 +102,7 @@ class DeepFaceTag(Stage):
 
                 facial_area = found['facial_area']
                 f.add_tag(Tag(TAG_FACE,
-                              pt1=(facial_area['x'],facial_area['y']),
+                              xy=(facial_area['x'],facial_area['y']),
                               w=facial_area['w'],
                               h=facial_area['h'],
                               **found))

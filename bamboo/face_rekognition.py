@@ -61,8 +61,8 @@ class RekognitionFaceDetect(Stage):
             w  = int(fd['BoundingBox']['Width']*f.width)
             h = int(fd['BoundingBox']['Height']*f.height)
 
-            f.add_tag( Tag( TAG_FACE,
-                            pt1 = top_left,
+            f.add_tag( Patch( TAG_FACE,
+                            xy = top_left,
                             w=w, h=h,
                             text = "aws face",
                             faceDetails = fd))

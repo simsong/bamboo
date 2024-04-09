@@ -203,8 +203,8 @@ class Yolo8FaceTag(Stage):
             fqa_probs = self.fqa.detect(crop_img)    # get the face quality
             fqa_prob_mean = round(np.mean(fqa_probs), 2)
 
-            f.add_tag(Tag(TAG_FACE,
-                          pt1=(x,y), w=w, h=h, fqa = fqa_prob_mean,
+            f.add_tag(Patch(TAG_FACE,
+                          xy=(x,y), w=w, h=h, fqa = fqa_prob_mean,
                           text=f"fqa_score {fqa_prob_mean:4.2f}"))
         # output the copy
         self.output(f)

@@ -100,10 +100,10 @@ class Multiplex(Stage):
 
 
 class WriteFramesToDirectory(Stage):
-    def __init__(self, *, root, template=DEFAULT_JPG_TEMPLATE):
+    def __init__(self, root, *, template=DEFAULT_JPG_TEMPLATE):
         super().__init__()
-        self.root = root
-        self.counter = 0
+        self.root     = root
+        self.counter  = 0
         self.template = template
         self.dirsmade = set()
 

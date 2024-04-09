@@ -20,7 +20,9 @@ import yaml
 import cv2
 from lib.ctools.timer import Timer
 
-from  bamboo.frame import Tag,TAG_SKIPPED
+from bamboo.frame import Tag,TAG_SKIPPED
+from bamboo.constants import C
+from bamboo.source import FrameStream
 
 # We use the cache to avoid making the same directory twice
 @functools.lru_cache(maxsize=128)
@@ -132,7 +134,7 @@ class IngestCamera():
         This could be replaced with a priority queue or a double-ended queue.
         """
         ary = FrameArray()
-        for f in Frame.FrameStream(self.config['source']):
+        for f in FrameStream(self.config['source']):
             ary.add(f)
 
         # Get the first and retain

@@ -79,9 +79,10 @@ class Frame:
         self.src  = src
         self.tags = []
         self.tags_added = 0
+
         # These are for overriding the properties
-        self.width_ = None
-        self.height_ = None
+        self.w_ = None
+        self.h_ = None
         self.depth_ = None
         self.bytes_ = None
         self.img_   = None
@@ -100,13 +101,12 @@ class Frame:
     def __lt__(self, b):
         return  self.mtime < b.mtime
     def __repr__(self):
-        return f"<Frame path={self.path} src={self.src} tags={self.tags}>"
+        return f"<Frame path={self.path} src={self.src} tags={[tag.tag_type for tag in self.tags]}>"
 
     def save(self, fname):
         r = cv2.imwrite(fname, self.img)
         if r is False:
             raise FileNotFoundError(f"could not write image: {fname}")
-
 
     def copy(self):
         """Returns a copy, but with the original img and tags. Setting a tag makes that copy.
@@ -126,13 +126,14 @@ class Frame:
         """Return a unique hash of the image"""
         return hash_read(self.path)
 
-    def annotate( self, i, pt1, pt2, text, *, textcolor=C.GREEN, boxcolor=C.RED, thickness=2):
-        (x,y) = pt1
-        cv2.rectangle(i, pt1, pt2, boxcolor, thickness=thickness)
-        cv2.putText(i, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.8, textcolor, thickness=thickness)
+    def annotate( self, i, xy, w, h, text, *, textcolor=C.GREEN, boxcolor=C.RED, thickness=2):
+        cv2.rectangle(i, xy, (xy[0]+w, xy[1]+h), boxcolor, thickness=thickness)
+        cv2.putText(i, text, (xy[0], xy[1] - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, textcolor, thickness=thickness)
 
     def add_tag(self, tag):
-        # Before we add the first tag, copy the tags array so that this frame has its own copy of the array
+        # Before we add the first tag, copy the tags array so that this frame
+        # has its own copy of the array
         if self.tags_added == 0:
             self.tags = copy.copy(self.tags)
         self.tags.append(tag)
@@ -156,7 +157,7 @@ class Frame:
         i = self.img.copy()
         for tag in self.tags:
             if tag.type==FACE:
-                self.annotate( i, tag.pt1, tag.pt2, text=tag.text)
+                self.annotate( i, tag.xy, tag.w, tag.h, text=tag.text)
         self.show(i=i, title=title, wait=wait)
 
     @property
@@ -178,14 +179,14 @@ class Frame:
 
     @property
     @functools.lru_cache(maxsize=3)
-    def width(self):
-        return self.width_ if self.width_ is not None else self.img.shape[1]
+    def w(self):
+        return self.w_ if self.w_ is not None else self.img.shape[1]
 
     @property
     @functools.lru_cache(maxsize=3)
-    def height(self):
+    def h(self):
         """height (y) is the first index in the shape. nparray goes from lsb to msb"""
-        return self.height_  if self.height_  is not None else self.img.shape[0]
+        return self.h_  if self.h_  is not None else self.img.shape[0]
 
     @property
     @functools.lru_cache(maxsize=3)
@@ -199,57 +200,31 @@ class Frame:
             return 0            # not similar at all
         return img_sim(self.img, i2.img)
 
-    def crop(self, pt1, pt2):
+    def crop(self, *, xy, w, h):
         """Return a new Frame that is the old one cropped"""
-        cf = CroppedFrame(self, pt1, pt2)
+        cf = CroppedFrame(self, xy=xy, w=w, h=h)
         return cf
 
 class CroppedFrame(Frame):
-    def __init__(self, src, pt1, pt2):
+    def __init__(self, *, src, xy, w, h):
         super().__init__()
-        min_x = min(pt1[0],pt2[0])
-        min_y = min(pt1[1],pt2[1])
-        max_x = max(pt1[0],pt2[0])
-        max_y = max(pt1[1],pt2[1])
-        self.src = f"Cropped from {self.src} [{min_x}:{max_x}, {min_y}:{max_y}]"
-        self.width_ = max_x - min_x
-        self.height_ = max_y - min_y
-        self.img_ = np.copy(src.img[min_y:max_y, min_x:max_x])
+        self.src = f"Cropped from {self.src}"
+        self.w_ = w
+        self.h_ = h
+        # This is weird, but correct. Slice order is y,x but the point stores x at xy[0].
+        self.img_ = np.copy(src.img[xy[1]:xy[1]+h, xy[0]:xy[0]:x])
 
 class Tag:
     def __init__(self, tag_type, **kwargs):
         self.text = ""
-        self.pt2_ = None
-        self.w_   = None
-        self.h_   = None
         self.tag_type = tag_type
         for (k,v) in kwargs.items():
-            if k=='pt2':
-                self.pt2_ = v
-            elif k=='w':
-                self.w_ = v
-            elif k=='h':
-                self.h_ = v
-            else:
-                setattr(self, k, v)
-
-    @property
-    def pt2(self):
-        if self.pt2_ is not None:
-            return self.pt2_
-        if self.w_ is None or self.h_ is None:
-            raise AttributeError(".pt2 requested but neither .pt2 nor .w and .h are set")
-        return (self.pt1[0] + self.w_, self.pt1[0]+self.h_)
-
-    def w(self):
-        if self.w_ is not None:
-            return self.w_
-        return self.pt2[0]-self.pt1[0]
-
-    def h(self):
-        if self.h_ is not None:
-            return self.h_
-        return self.pt2[0]-self.pt1[0]
+            setattr(self, k, v)
 
     def __repr__(self):
-        return f"<TAG {self.tag_type} {json.dumps(self.__dict__,default=str)}>"
+        return f"<{self.__class__.__name__} {self.tag_type} {self.__dict__.keys()}>"
+
+class Patch(Tag):
+    """A Patch is a special kind of tag that refers to just a specific area of the Frame"""
+    def __init__(self, tag_type, **kwargs):
+        super().__init__(tag_type, **kwargs)

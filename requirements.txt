@@ -4,3 +4,4 @@ imutils
 pyyaml
 deepface
 tf-keras
+scikit-learn
