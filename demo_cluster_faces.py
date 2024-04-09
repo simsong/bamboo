@@ -18,25 +18,27 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser(description="Extract all faces from a list of photos",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("root", help='Directory to process.')
-    parser.add_argument("--db", help="Output databaae.", nargs=1, default='faces')
+    parser.add_argument("--add", help='add face(s) from this directory or file')
+    parser.add_argument("--facedir", help="Where to write the faces", required=True)
+    parser.add_argument("--db", help="Output databaae.", required=True, default='faces')
     parser.add_argument("--dump",help="dump the database before clustering",action='store_true')
     args = parser.parse_args()
 
-    p = SingleThreadedPipeline()
 
-    def tagfilter(t):
-        print("Filter type=",t.tag_type)
+    def face_tags(t):
+        """A filter for face tags"""
         return t.tag_type == TAG_FACE
 
-    dbpath  = args.db
-    p.addLinearPipeline([ DeepFaceTag(face_detector='yolov8'),
-                          ExtractFacesToFrames(scale=1.3),
-                          SaveTagsToShelf(tagfilter = tagfilter, path=dbpath)])
-
-    p.process_list( FrameStream( args.root ) )
+    if args.add:
+        p = SingleThreadedPipeline()
+        p.addLinearPipeline([ DeepFaceTag(face_detector='yolov8'),
+                              ExtractFacesToFrames(scale=1.3),
+                              WriteFramesToDirectory(root=args.facedir),
+                              SaveTagsToShelf(tagfilter = face_tags, path=args.db)])
+        p.process_list( FrameStream( args.add ) )
 
     with shelve.open(args.db, writeback=False) as db:
         if args.dump:
+            print("dumping...")
             for (k,v) in db.items():
                 print("k=",k,"v=",v)

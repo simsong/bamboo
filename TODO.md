@@ -1,5 +1,8 @@
 - [ ] Review Apache Airflow. airflow.apache.com. Is this worth using?
 
+# Metadata we need:
+- [ ] Something like the forensic path
+
 # Stages we need:
 - [ ] Stage  that implement If statements.
 - [ ] Stage that implement forks

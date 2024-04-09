@@ -13,6 +13,8 @@ from filelock import FileLock
 
 from .frame import Frame
 
+DEFAULT_JPG_TEMPLATE="frame{counter:08}.jpg"
+
 class Stage(ABC):
     """Abstract base class for processing DAG"""
 
@@ -95,20 +97,29 @@ class Multiplex(Stage):
         self.output(f)
 
 class WriteFramesToDirectory(Stage):
-    def __init__(self, root, template):
+    def __init__(self, *, root, template=DEFAULT_JPG_TEMPLATE):
         super().__init__()
         self.root = root
         self.counter = 0
         self.template = template
+        self.dirsmade = set()
     def process(self, f:Frame):
         fname = os.path.join(self.root, self.template.format(counter=self.counter))
-        print("==> write to",fname)
+        # make sure directory exists
+        dirname = os.path.dirname(fname)
+        if dirname not in self.dirsmade:
+            os.makedirs( dirname , exist_ok=True )
+            self.dirsmade.add(dirname)
+        # Save and incrementa counter
         f.save(fname)
         self.counter += 1
+        # and copy the frame to the output (we are not a sink!)
+        self.output(f)
+
 
 
 class SaveTagsToShelf(Stage):
-    def __init__(self, *, tagfilter=None, path):
+    def __init__(self, *, tagfilter=None, path:str):
         """Saves tags that pass tagfilter to the shelf, with locking"""
         super().__init__()
         self.tagfilter = tagfilter

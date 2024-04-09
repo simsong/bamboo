@@ -73,7 +73,9 @@ class Frame:
     If a stage modifies a Frame, it needs to make a copy first."""
     jpeg_quality = DEFAULT_JPEG_QUALITY
     def __init__(self, *, path=None, img=None, src=None, mime_type=None):
-        self.path = path
+        self.path = path        # if read or written to a file, the path
+        self.uri  = None        # the full uri; to replace path
+        self.provenance = []    # what was done to this frame
         self.src  = src
         self.tags = []
         self.tags_added = 0

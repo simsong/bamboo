@@ -171,3 +171,8 @@ config.yml
 .DS_Store
 out
 *.ipynb
+*.db
+*.lock
+data
+facedir
+hosts
