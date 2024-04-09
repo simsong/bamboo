@@ -30,8 +30,10 @@ class Stage(ABC):
         self.registered_stages.append(self)
 
     @abstractmethod
-    def process(self, frame:Frame):
-        """Called to process"""
+    def process(self, f:Frame):
+        """Called to process. Default behavior is to copy frame to output."""
+        self.output(f)
+
 
     def _run_frame(self,f):
         """called at the start of processing of this stage.
@@ -92,9 +94,10 @@ class ShowTags(Stage):
         self.output(f)
 
 class Multiplex(Stage):
-    """Simply copies from intputs to outputs. Of course, that's the basic functionality, so we do nothing."""
+    """Simply copies from intputs to outputs. ."""
     def process(self, f:Frame):
         self.output(f)
+
 
 class WriteFramesToDirectory(Stage):
     def __init__(self, *, root, template=DEFAULT_JPG_TEMPLATE):
@@ -103,15 +106,17 @@ class WriteFramesToDirectory(Stage):
         self.counter = 0
         self.template = template
         self.dirsmade = set()
+
     def process(self, f:Frame):
-        fname = os.path.join(self.root, self.template.format(counter=self.counter))
+        f = f.copy()
+        f.path = os.path.join(self.root, self.template.format(counter=self.counter))
         # make sure directory exists
-        dirname = os.path.dirname(fname)
+        dirname = os.path.dirname(f.path)
         if dirname not in self.dirsmade:
             os.makedirs( dirname , exist_ok=True )
             self.dirsmade.add(dirname)
         # Save and incrementa counter
-        f.save(fname)
+        f.save(f.path)
         self.counter += 1
         # and copy the frame to the output (we are not a sink!)
         self.output(f)
@@ -119,26 +124,28 @@ class WriteFramesToDirectory(Stage):
 
 
 class SaveTagsToShelf(Stage):
-    def __init__(self, *, tagfilter=None, path:str):
+    def __init__(self, *, tagfilter=None, path:str, requirePaths=False):
         """Saves tags that pass tagfilter to the shelf, with locking"""
         super().__init__()
         self.tagfilter = tagfilter
         self.path      = path
         self.lockfile  = path + ".lock"
+        self.requirePaths = requirePaths
 
     def process(self, f:Frame):
+        if self.requirePaths:
+            assert f.path is not None
         if self.tagfilter is not None:
             print("f.tags+",f.tags)
             tags = [tag for tag in f.tags if self.tagfilter(tag)]
         else:
             tags = f.tags
-        print("tags=",tags)
         if tags:
             with FileLock(self.lockfile) as lock:
                 with shelve.open(self.path,writeback=True) as db:
                     for tag in tags:
-                        db[str(uuid.uuid4())] = (f.path, f.src, tag)
-                        print("saved!")
+                        db[str(uuid.uuid4())] = {'path':f.path, 'src':f.src, 'tag':tag}
+        self.output(f)
 
 def Connect(prev_:Stage, next_:Stage):
     """Make the output of stage prev_ go to next_"""

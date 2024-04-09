@@ -34,11 +34,14 @@ if __name__=="__main__":
         p.addLinearPipeline([ DeepFaceTag(face_detector='yolov8'),
                               ExtractFacesToFrames(scale=1.3),
                               WriteFramesToDirectory(root=args.facedir),
-                              SaveTagsToShelf(tagfilter = face_tags, path=args.db)])
+                              SaveTagsToShelf(tagfilter = face_tags, path=args.db, requirePaths=True)])
         p.process_list( FrameStream( args.add ) )
 
+    # Now gather all of the paths and embeddings in order
+    paths = []
+    embeddings = []
     with shelve.open(args.db, writeback=False) as db:
-        if args.dump:
-            print("dumping...")
-            for (k,v) in db.items():
+        for (k,v) in db.items():
+            paths.append(v['path'])
+            if args.dump:
                 print("k=",k,"v=",v)
