@@ -140,7 +140,7 @@ class WriteTagsToDirectory(Stage):
         tags = [tag for tag in f.tags if self.tagfilter(tag)] if (self.tagfilter is not None) else f.tags
         for tag in tags:
             with open( os.path.join(self.path, str(uuid.uuid4()) + ".tag"), "wb") as fd:
-                pickle.dump({'path':f.path, 'src':f.src, 'tag':tag},fd)
+                pickle.dump( FrameTagDict(f,tag), fd)
         self.output(f)
 
 def Connect(prev_:Stage, next_:Stage):

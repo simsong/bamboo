@@ -10,6 +10,7 @@ https://docs.opencv.org/4.x/dd/d43/tutorial_py_video_display.html
 
 """
 
+import sys
 import os
 import functools
 from datetime import datetime
@@ -54,7 +55,12 @@ def FrameStream(root):
                 if mtype.split("/")[0] in ['video','image']:
                     path = os.path.join(dirpath, fname)
                     if os.path.getsize(path)>0:
-                        yield Frame(path=path, mime_type=mtype)
+                        try:
+                            f = Frame(path=path, mime_type=mtype)
+                        except FileNotFoundError as e:
+                            print(f"Cannot read '{path}': {e}",file=sys.stderr)
+                            continue
+                        yield f
     else:
         yield Frame(path=root)
 
@@ -65,7 +71,10 @@ def DissimilarFrameStream(root, score=0.90):
         try:
             st = f.similarity(ref)
         except cv2.error as e: # pylint: disable=catching-non-exception
-            print(f"Error {e} with {i.path}",file=sys.stderr)
+            print(f"Error: {e} with {f.path}",file=sys.stderr)
+            continue
+        except FileNotFoundError as e:
+            print(f"Cannot read '{f.path}': {e}",file=sys.stderr)
             continue
         if st < score:
             yield f

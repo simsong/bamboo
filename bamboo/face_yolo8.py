@@ -209,6 +209,32 @@ class Yolo8FaceTag(Stage):
         # output the copy
         self.output(f)
 
+class Yolo8FaceQualityAssessemtn(Stage):
+    """Just apply the FaceQualityAssessment to the face tags on the frame."""
+    TODO
+
+    face_detector = YOLOv8_face(YOLO8N_FACE_PATH,
+                                conf_thres=CONF_THRESHOLD,
+                                iou_thres=NMS_THRESHOLD)
+    fqa = FaceQualityAssessment(YOLO8N_QUALITY_ASSESSMENT)
+
+    def process(self, f:Frame):
+        # Detect Objects
+        # we will be adding tags, so make a copy of this frame
+        f = f.copy()
+        boxes, scores, classids, kpts = self.face_detector.detect(f.img)
+        for i, box in enumerate(boxes):
+            x, y, w, h = box.astype(int)
+            crop_img = f.img[y:y + h, x:x + w]  # crop - can also be done after facial alignment
+            fqa_probs = self.fqa.detect(crop_img)    # get the face quality
+            fqa_prob_mean = round(np.mean(fqa_probs), 2)
+
+            f.add_tag(Patch(TAG_FACE,
+                          xy=(x,y), w=w, h=h, fqa = fqa_prob_mean,
+                          text=f"fqa_score {fqa_prob_mean:4.2f}"))
+        # output the copy
+        self.output(f)
+
 if __name__ == '__main__':
     "A little test program"
     parser = argparse.ArgumentParser()

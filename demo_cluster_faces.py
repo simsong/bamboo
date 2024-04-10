@@ -5,12 +5,14 @@ A simple pipeline to extract all of the faces from a set of photos, write them t
 
 import os
 import pickle
+import math
 
 from sklearn.cluster import DBSCAN
 from sklearn.metrics.pairwise import cosine_distances
 import numpy as np
 
 from lib.ctools import clogging
+from lib.ctools import timer
 
 from bamboo.pipeline import SingleThreadedPipeline
 from bamboo.stage import WriteFramesToDirectory,WriteTagsToDirectory,ShowTags,Connect
@@ -19,6 +21,12 @@ from bamboo.face import ExtractFacesToFrames
 from bamboo.source import DissimilarFrameStream
 from bamboo.frame import TAG_FACE
 
+
+def any_nan(vect):
+    for v in vect:
+        if math.isnan(v):
+            return True
+    return False
 
 if __name__=="__main__":
     import argparse
@@ -56,18 +64,20 @@ if __name__=="__main__":
         p.process_list( DissimilarFrameStream( args.add ) )
 
     # Now gather all of the paths and embeddings in order
-    paths = []
     embeddings = []
-    for name in os.listdir(args.tagdir):
-        if name.endswith(".tag"):
-            with open( os.path.join(args.tagdir, name), "rb") as f:
-                v = pickle.load(f)
-
-                paths.append(v['path'])
-                embeddings.append(v['tag'].embedding)
-                if args.dump:
-                    print("name=",name,"v=",v)
-
+    frametags = []
+    with timer.Timer("time to read") as t:
+        for name in os.listdir(args.tagdir):
+            if name.endswith(".tag"):
+                with open( os.path.join(args.tagdir, name), "rb") as f:
+                    v = pickle.load(f)
+                    embedding = v['tag'].embedding
+                    if any_nan(embedding):
+                        continue
+                    frametags.append(v)
+                    embeddings.append(embedding)
+                    if args.dump:
+                        print("name=",name,"v=",v)
 
     # Convert list of embeddings to a numpy array for efficient computation
     X = np.array(embeddings)
@@ -76,12 +86,38 @@ if __name__=="__main__":
     # Note: DBSCAN expects a distance matrix for the metric='precomputed',
     # so we use cosine_distances to compute the distance matrix from our embeddings
     # DBSCAN parameters like eps and min_samples can be adjusted based on your specific dataset and needs
-    dbscan = DBSCAN(eps=0.5, min_samples=2, metric='precomputed')
-    clusters = dbscan.fit_predict(cosine_distances(X))
-    print("clusters:",clusters)
+    with timer.Timer("time to cluster") as t:
+        dbscan = DBSCAN(eps=0.5, min_samples=2, metric='precomputed')
+        clusters = dbscan.fit_predict(cosine_distances(X))
+
     maxcluster = max(clusters)
-    for cl in range(maxcluster+1):
-        print(f"Cluster {cl}")
-        for (ct,path) in enumerate(paths):
-            if clusters[ct]==cl:
-                print("  ",path)
+    print("cluster count:","max:",maxcluster)
+
+    with open("cluster.html","w") as c:
+        c.write("""
+        <html>
+        <style>
+        img.Image {
+             max-width:128px;
+             width:128px;
+        }
+        </style>
+        <body>
+        """)
+        for cl in range(maxcluster+1):
+            c.write(f"<h2>Cluster {cl}:</h2>")
+            count = 0
+            for (ct,frametag) in enumerate(frametags):
+                if clusters[ct]==cl:
+                    count += 1
+                    if count<5:
+                        path = frametag['path']
+                        try:
+                            src  = frametag['tag'].src
+                        except AttributeError:
+                            print("no src for:",frametag['tag'])
+                            src  = ""
+                        c.write(f"<a href='{src}'> <img src='{path}' class='Image'/></a>\n  ")
+                    if count==5:
+                        c.write("...")
+            c.write("<br/><hr/>")

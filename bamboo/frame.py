@@ -52,6 +52,8 @@ def hash_read(path):
 def image_read(path):
     """Caching image read. We cache to minimize what's stored in memory. We make it immutable to allow sharing"""
     img = cv2.imdecode(np.frombuffer( bytes_read(path), np.uint8), cv2.IMREAD_ANYCOLOR)
+    if img is None:
+        raise FileNotFoundError("cannot read:"+path)
     img.flags.writeable = False
     return img
 
@@ -228,7 +230,13 @@ class Tag:
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.tag_type} {self.__dict__.keys()}>"
 
+    def dict(self):
+        return self.__dict__
+
 class Patch(Tag):
     """A Patch is a special kind of tag that refers to just a specific area of the Frame"""
     def __init__(self, tag_type, **kwargs):
         super().__init__(tag_type, **kwargs)
+
+def FrameTagDict(f,t):
+    return {'path':f.path, 'src':f.src, 'tag':tag}
