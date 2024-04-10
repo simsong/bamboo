@@ -9,6 +9,7 @@ import collections
 import sys
 from abc import ABC,abstractmethod
 import atexit
+import logging
 
 from .frame import Frame
 from .stage import Connect
@@ -20,6 +21,7 @@ class Pipeline(ABC):
         self.queued_output_stage_frame_pairs = collections.deque()
         self.head = None
         self.stages = set()
+        self.count  = 0
 
     def queue_output_stage_frame_pair(self, pair):
         self.queued_output_stage_frame_pairs.append(pair)
@@ -35,6 +37,7 @@ class Pipeline(ABC):
 
     def process(self, f):
         """Run a frame through the pipeline. This interface will be moved entirely into the pipeline"""
+        self.count += 1
         self.queue_output_stage_frame_pair( (self.head, f))
         self.run_queue()
 
@@ -49,25 +52,30 @@ class Pipeline(ABC):
     def print_stats(self, out=sys.stdout):
         for stage in self.stages:
             name = stage.__class__.__name__
-            print(f"{name}: calls: {stage.count}  mean: {stage.t_mean}s  stddev: {stage.t_stddev}", file=out)
+            print(f"{name}: calls: {stage.count}  mean: {stage.t_mean:.2}s  stddev: {stage.t_stddev:.2}",
+                  file=out)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.print_stats(out=self.out)
+        return self
 
 
 class SingleThreadedPipeline(Pipeline):
     """Runs the pipeline in the caller's thread. Print stats on exit"""
-    def __init__(self, atExitStats=True, out=sys.stdout):
+    def __init__(self, out=sys.stdout):
         super().__init__()
-        self.atExitStats=atExitStats
         self.out = out
 
     def run_queue(self):
-        # Now pass to the next. This logic needs to be moved into the linear pipeline and have the output function store
-        # (s,f) pairs.
-        if self.atExitStats:
-            atexit.register(self.print_stats, out=self.out)
+        # Now pass to the next. This logic needs to be moved into the linear pipeline
+        # and have the output function store (s,f) pairs.
         while True:
             try:
                 (s,f) = self.queued_output_stage_frame_pairs.popleft()
             except IndexError:
                 break
-            print("run_queue: ",s,f)
+            logging.debug("%s processing %s",s,f)
             s._run_frame(f)

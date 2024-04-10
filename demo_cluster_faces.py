@@ -3,18 +3,20 @@
 A simple pipeline to extract all of the faces from a set of photos, write them to a directory with metadata, and produce face clusters.
 """
 
-import shelve
+import os
+import pickle
 
 from sklearn.cluster import DBSCAN
 from sklearn.metrics.pairwise import cosine_distances
 import numpy as np
 
+from lib.ctools import clogging
 
 from bamboo.pipeline import SingleThreadedPipeline
-from bamboo.stage import WriteFramesToDirectory,SaveTagsToShelf,ShowTags
+from bamboo.stage import WriteFramesToDirectory,WriteTagsToDirectory,ShowTags,Connect
 from bamboo.face_deepface import DeepFaceTag
 from bamboo.face import ExtractFacesToFrames
-from bamboo.source import FrameStream
+from bamboo.source import DissimilarFrameStream
 from bamboo.frame import TAG_FACE
 
 
@@ -25,39 +27,46 @@ if __name__=="__main__":
 
     parser.add_argument("--add", help='add face(s) from this directory or file')
     parser.add_argument("--facedir", help="Where to write the faces")
-    parser.add_argument("--db", help="Output databaae.", required=True, default='faces')
+    parser.add_argument("--tagdir", help="Where to write tags", required=True)
     parser.add_argument("--dump",help="dump the database before clustering",action='store_true')
+    parser.add_argument("--show", help="Show faces as they are ingested", action='store_true')
+    clogging.add_argument(parser, loglevel_default='WARNING')
     args = parser.parse_args()
+    clogging.setup(level=args.loglevel)
 
     if args.add and not args.facedir:
         raise RuntimeError("--add requires --facedir")
 
+    os.makedirs(args.tagdir, exist_ok=True)
 
     def face_tags(t):
         """A filter for face tags"""
         return t.tag_type == TAG_FACE
 
     if args.add:
-        p = SingleThreadedPipeline()
-        p.addLinearPipeline(
-            [ DeepFaceTag(face_detector='yolov8'),
-              ShowTags(wait=200),
-              ExtractFacesToFrames(scale=1.3),
-              WriteFramesToDirectory(root=args.facedir),
-              SaveTagsToShelf(tagfilter = face_tags,
-                              path=args.db,
-                              requirePaths=True)])
-        p.process_list( FrameStream( args.add ) )
+        with SingleThreadedPipeline() as p:
+            p.addLinearPipeline([ dt:= DeepFaceTag(face_detector='yolov8'),
+                                  ExtractFacesToFrames(scale=1.3),
+                                  WriteFramesToDirectory(root=args.facedir),
+                                  WriteTagsToDirectory(tagfilter = face_tags, path=args.tagdir)])
+
+        if args.show:
+            Connect(dt, ShowTags(wait=200))
+
+        p.process_list( DissimilarFrameStream( args.add ) )
 
     # Now gather all of the paths and embeddings in order
     paths = []
     embeddings = []
-    with shelve.open(args.db, writeback=False) as db:
-        for (k,v) in db.items():
-            paths.append(v['path'])
-            embeddings.append(v['tag'].embedding)
-            if args.dump:
-                print("k=",k,"v=",v)
+    for name in os.listdir(args.tagdir):
+        if name.endswith(".tag"):
+            with open( os.path.join(args.tagdir, name), "rb") as f:
+                v = pickle.load(f)
+
+                paths.append(v['path'])
+                embeddings.append(v['tag'].embedding)
+                if args.dump:
+                    print("name=",name,"v=",v)
 
 
     # Convert list of embeddings to a numpy array for efficient computation

@@ -2,12 +2,14 @@
 Stage implementation and some simple stages.
 """
 
+import sys
 import os
 import time
 import math
 import collections
 import uuid
 import shelve
+import pickle
 from abc import ABC,abstractmethod
 from filelock import FileLock
 
@@ -116,35 +118,29 @@ class WriteFramesToDirectory(Stage):
             os.makedirs( dirname , exist_ok=True )
             self.dirsmade.add(dirname)
         # Save and incrementa counter
-        f.save(f.path)
+        try:
+            f.save(f.path)
+        except FileNotFoundError as e:
+            print("Could not write ",f.path,file=sys.stderr)
+            print(e,file=sys.stderr)            # but continue
         self.counter += 1
         # and copy the frame to the output (we are not a sink!)
         self.output(f)
 
 
-
-class SaveTagsToShelf(Stage):
-    def __init__(self, *, tagfilter=None, path:str, requirePaths=False):
+class WriteTagsToDirectory(Stage):
+    def __init__(self, *, tagfilter=None, path:str ):
         """Saves tags that pass tagfilter to the shelf, with locking"""
         super().__init__()
         self.tagfilter = tagfilter
         self.path      = path
         self.lockfile  = path + ".lock"
-        self.requirePaths = requirePaths
 
-    def process(self, f:Frame):
-        if self.requirePaths:
-            assert f.path is not None
-        if self.tagfilter is not None:
-            print("f.tags+",f.tags)
-            tags = [tag for tag in f.tags if self.tagfilter(tag)]
-        else:
-            tags = f.tags
-        if tags:
-            with FileLock(self.lockfile) as lock:
-                with shelve.open(self.path,writeback=True) as db:
-                    for tag in tags:
-                        db[str(uuid.uuid4())] = {'path':f.path, 'src':f.src, 'tag':tag}
+    def process(self, f: Frame):
+        tags = [tag for tag in f.tags if self.tagfilter(tag)] if (self.tagfilter is not None) else f.tags
+        for tag in tags:
+            with open( os.path.join(self.path, str(uuid.uuid4()) + ".tag"), "wb") as fd:
+                pickle.dump({'path':f.path, 'src':f.src, 'tag':tag},fd)
         self.output(f)
 
 def Connect(prev_:Stage, next_:Stage):

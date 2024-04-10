@@ -65,7 +65,7 @@ def image_grayscale(path):
 def similarity_for_two(t):
     """Similarity of two CV2 images on a scale of 0 to 1.0.
     This form is used to allow for multiprocessing, since we cannot send . """
-    return (t[0],t[1],img_sim(t[2],t[3]).score)
+    return (t[0],t[1],img_sim(t[2],t[3]))
 
 
 class Frame:
@@ -104,7 +104,10 @@ class Frame:
         return f"<Frame path={self.path} src={self.src} tags={[tag.tag_type for tag in self.tags]}>"
 
     def save(self, fname):
-        r = cv2.imwrite(fname, self.img)
+        try:
+            r = cv2.imwrite(fname, self.img)
+        except cv2.error as e:
+            raise FileNotFoundError(f"could not write image: {fname}") from e
         if r is False:
             raise FileNotFoundError(f"could not write image: {fname}")
 
@@ -156,7 +159,7 @@ class Frame:
     def show_tags(self, title=None, wait=0):
         i = self.img.copy()
         for tag in self.tags:
-            if tag.type==FACE:
+            if tag.tag_type==TAG_FACE:
                 self.annotate( i, tag.xy, tag.w, tag.h, text=tag.text)
         self.show(i=i, title=title, wait=wait)
 
@@ -202,7 +205,7 @@ class Frame:
 
     def crop(self, *, xy, w, h):
         """Return a new Frame that is the old one cropped"""
-        cf = CroppedFrame(self, xy=xy, w=w, h=h)
+        cf = CroppedFrame(src=self, xy=xy, w=w, h=h)
         return cf
 
 class CroppedFrame(Frame):
@@ -211,8 +214,9 @@ class CroppedFrame(Frame):
         self.src = f"Cropped from {self.src}"
         self.w_ = w
         self.h_ = h
-        # This is weird, but correct. Slice order is y,x but the point stores x at xy[0].
-        self.img_ = np.copy(src.img[xy[1]:xy[1]+h, xy[0]:xy[0]:x])
+        # This is weird, but correct.
+        # Slice order is y,x but the point stores x at xy[0].
+        self.img_ = np.copy(src.img[xy[1]:xy[1]+h, xy[0]:xy[0]+w])
 
 class Tag:
     def __init__(self, tag_type, **kwargs):

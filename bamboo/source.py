@@ -16,6 +16,7 @@ from datetime import datetime
 import json
 import copy
 import mimetypes
+import logging
 
 import cv2
 import numpy as np
@@ -59,15 +60,20 @@ def FrameStream(root):
 
 def DissimilarFrameStream(root, score=0.90):
     ref = None
+    count = 0
     for f in FrameStream(root):
         try:
-            score = f.similarity(ref)
+            st = f.similarity(ref)
         except cv2.error as e: # pylint: disable=catching-non-exception
             print(f"Error {e} with {i.path}",file=sys.stderr)
             continue
-        if score <= self.sim_threshold:
+        if st < score:
             yield f
             ref = f
+        else:
+            count += 1
+            logging.debug("count=%s skip %s",count,f)
+
 
 def CameraFrameStream(camera=0,*, frameWidth=None,frameHeight=0):
     # https://docs.opencv.org/3.4/dd/d01/group__videoio__c.html

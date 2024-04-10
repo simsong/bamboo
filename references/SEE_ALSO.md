@@ -109,3 +109,6 @@ Frames in the following hiearchy, which is designed so that there are between 50
 
 # Code to steal:
 test_face_detector.py:
+
+
+https://machinelearning.apple.com/research/recognizing-people-photos
