@@ -5,6 +5,9 @@ A simple pipeline to extract all of the faces from a set of photos, write them t
 
 import os
 import math
+import logging
+import json
+
 from collections import defaultdict
 
 from sklearn.cluster import DBSCAN
@@ -71,6 +74,7 @@ def cluster_faces(*, rootdir, facedir, tagdir, dump, show):
             frametags.append(v)
             embeddings.append(embedding)
 
+    logging.debug("number of embeddings:%s",len(embeddings))
 
     # Convert list of embeddings to a numpy array for efficient computation
     X = np.array(embeddings)
@@ -89,14 +93,18 @@ def cluster_faces(*, rootdir, facedir, tagdir, dump, show):
     # Assign each tag to its cluster
     ftdict = defaultdict(list)
     for (cluster,frametag) in zip(clusters,frametags):
+        logging.debug("cluster %s path %s",cluster,frametag['path'])
         frametag['tag'].cluster = cluster
-        ftdict[cluster] =frametag
+        ftdict[cluster].append(frametag)
+
 
     with open("cluster.html","w") as c:
         c.write(HTML_HEAD)
         for cl in range(maxcluster+1):
+            logging.debug("ftdict[%s]=%s",cl,ftdict[cl])
             c.write(f"<h2>Cluster {cl}:</h2>")
             for (ct,frametag) in enumerate(ftdict[cl]):
+                logging.debug("ct=%s frametag=%s",ct,frametag)
                 if ct<5:
                     path = frametag['path']
                     try:
@@ -110,6 +118,7 @@ def cluster_faces(*, rootdir, facedir, tagdir, dump, show):
                 else:
                     break
             c.write("<br/><hr/>")
+    abort()
 
 
 if __name__=="__main__":

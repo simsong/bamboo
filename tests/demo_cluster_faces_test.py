@@ -1,4 +1,8 @@
 import sys
+import tempfile
+import os
+import logging
+
 from os.path import dirname,basename,join,abspath
 from subprocess import call
 
@@ -10,9 +14,9 @@ import demo_cluster_faces
 
 def test_cluster_faces():
     # We don't clea up the cluster so that you can view it!
-    with tempfile.NamedTemporaryDirectory(delete=False) as td:
-        facedir = os.makedirs( join(td,'facedir'))
-        tagdir = os.makedirs( join(td,'tagdir'))
+    with tempfile.TemporaryDirectory(delete=False) as td:
+        os.makedirs( facedir := join(td,'facedir'))
+        os.makedirs( tagdir  := join(td,'tagdir'))
 
     demo_cluster_faces.cluster_faces(rootdir = DATA_DIR, facedir=facedir, tagdir=tagdir, dump=True, show=False)
     print(td)

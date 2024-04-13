@@ -2,6 +2,8 @@
 A number of stages that work with frames that are tagged with faces.
 """
 
+import logging
+
 from .frame import Frame,TAG_FACE,TAG_FACE_COUNT,Tag
 from .stage import Stage
 
@@ -39,5 +41,8 @@ class ExtractFacesToFrames(Stage):
                 (xy, w, h) = scale_from_center( xy=t.xy, w=t.w, h=t.h, scale=self.scale)
 
                 f2 = f.crop( xy=xy, w=w, h=h)
+                assert f2.path is None
                 f2.add_tag(t)   # add the tag! it has metadata
+                assert f2.path is None
+                logging.debug("output %s",f2)
                 self.output( f2 )

@@ -40,6 +40,9 @@ touch:
 pylint: $(REQ)
 	$(PYTHON) -m pylint --rcfile .pylintrc --fail-under=$(PYLINT_THRESHOLD) --verbose $(PYLINT_FILES)
 
+freeze:
+	$(PYTHON) -m pip freeze > requirements.txt
+
 clean:
 	find . -name '*~' -exec rm {} \;
 	/bin/rm -rf __pycache__ */__pycache__
@@ -50,6 +53,13 @@ eslint:
 
 pytest:
 	$(PYTHON) -m pytest bamboo/tests
+
+pytest-debug:
+	$(PYTHON) -m pytest -v --log-cli-level=DEBUG
+
+pytest-debug1:
+	@echo run in debug mode but stop on first error
+	$(PYTHON) -m pytest -v --log-cli-level=DEBUG --maxfail=1
 
 debug:
 	$(PYTHON) flask --app flask_app run --debug
@@ -92,3 +102,21 @@ install-windows:
 	$(PYTHON) -m pip install --upgrade pip
 	if [ -r requirements-windows.txt ]; then $(PIP_INSTALL) -r requirements-windows.txt ; else echo no requirements-windows.txt ; fi
 	if [ -r requirements.txt ];         then $(PIP_INSTALL) -r requirements.txt ; else echo no requirements.txt ; fi
+
+
+create_localdb:
+	@echo Creating local database, exercise the upgrade code and write credentials to etc/credentials.ini using etc/github_actions_mysql_rootconfig.ini
+	$(PYTHON) dbmaint.py --create_client=$$MYSQL_ROOT_PASSWORD                 --writeconfig etc/github_actions_mysql_rootconfig.ini
+	$(PYTHON) dbmaint.py --rootconfig etc/github_actions_mysql_rootconfig.ini  --createdb actions_test --schema etc/schema_0.sql --writeconfig etc/credentials.ini
+	$(PYTHON) dbmaint.py --rootconfig etc/github_actions_mysql_rootconfig.ini  --upgradedb actions_test --loglevel DEBUG
+	$(PYTHON) -m pytest -x --log-cli-level=DEBUG tests/dbreader_test.py
+
+remove_localdb:
+	@echo Removing local database using etc/github_actions_mysql_rootconfig.ini
+	$(PYTHON) dbmaint.py --rootconfig etc/github_actions_mysql_rootconfig.ini --dropdb actions_test --writeconfig etc/credentials.ini
+	/bin/rm -f etc/credentials.ini
+
+coverage:
+	$(PYTHON) -m pip install --upgrade pip
+	$(PIP_INSTALL) codecov pytest pytest_cov
+	$(PYTHON) -m pytest -v --cov=. --cov-report=xml tests

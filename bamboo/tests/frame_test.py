@@ -28,3 +28,7 @@ def test_frame():
     assert len(fc.history) == 2
     assert fc.history[0]==('path',ROBERTS_DATA)
     assert fc.history[1]==('crop',((50,75), (125,60)))
+
+    assert fc.path is None
+    with tempfile.NamedTemporaryFile(suffix='.jpg') as tf:
+        fc.save(tf.name)

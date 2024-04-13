@@ -102,26 +102,31 @@ class Multiplex(Stage):
 
 
 class WriteFramesToDirectory(Stage):
-    def __init__(self, root, *, template=DEFAULT_JPG_TEMPLATE):
+    def __init__(self, root, *, template=DEFAULT_JPG_TEMPLATE, nonstop=False):
+        """Write the frame to the directory, record the path where written, and move on.
+        If nonstop is True, do not stop for failed writer
+        """
         super().__init__()
         self.root     = root
         self.counter  = 0
+        self.error_counter = 0
         self.template = template
+        self.nonstop  = nonstop
 
     def process(self, f:Frame):
         f = f.copy()
-        f.path = os.path.join(self.root, self.template.format(counter=self.counter))
-        # make sure directory exists
-        dirname = os.path.dirname(f.path)
-        os.makedirs( dirname , exist_ok=True )
+        path = os.path.join(self.root, self.template.format(counter=self.counter))
 
         # Save and increment counter
         try:
-            f.save(f.path)
+            self.counter += 1
+            f.save(path)        # updates f.path
         except FileNotFoundError as e:
-            print("Could not write ",f.path,file=sys.stderr)
-            print(e,file=sys.stderr)            # but continue
-        self.counter += 1
+            if self.nonstop:
+                logging.error("Could not write %s %s",f.path,str(e))
+                self.error_counter += 1
+            else:
+                raise
         # and copy the frame to the output (we are not a sink!)
         self.output(f)
 

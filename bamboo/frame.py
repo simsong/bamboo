@@ -18,6 +18,7 @@ from datetime import datetime
 import json
 import copy
 import errno
+import logging
 
 import cv2
 import numpy as np
@@ -110,14 +111,12 @@ class Frame:
     def __repr__(self):
         return f"<Frame path={self.path} history={self.history} tags={[tag.tag_type for tag in self.tags]}>"
 
-    def save(self, fname):
-        try:
-            byte_array,r = cv2.imencode(self.img)
-        except cv2.error as e:
-            raise FileNotFoundError(f"could not encode image: {fname}") from e
-        if r is False:
-            raise FileNotFoundError(f"could not encode image: {fname}")
-        bamboo_save(fname, byte_array)
+    def save(self, path):
+        logging.debug("save path=%s self=%s",path,self)
+        bamboo_save(path, self.jpeg_bytes)
+        self.history.append((P_PATH,path))
+        self.path = path
+
 
     def copy(self):
         """Returns a copy, but with the original img and tags. Setting a tag makes that copy.
@@ -182,11 +181,12 @@ class Frame:
         return image_read(self.path)
 
     @property
-    def bytes(self):
+    def jpeg_bytes(self):
         """Returns as disk bytes or, if there are none, as a JPEG compressed"""
+        logging.debug("self=%s",self)
         if self.path is not None:
             return bytes_read(self.path)
-        return cv.imencode('.jpg', self.img_, [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality])[1]
+        return cv2.imencode('.jpg', self.img_, [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality])[1]
 
     @property
     @functools.lru_cache(maxsize=3)
@@ -224,6 +224,7 @@ class CroppedFrame(Frame):
         # This is weird, but correct.
         # Slice order is y,x but the point stores x at xy[0].
         self.img_ = np.copy(src.img[xy[1]:xy[1]+h, xy[0]:xy[0]+w])
+        self.path = None        # no path
         self.history.append((P_CROP, (xy,(w,h))))
 
 class Tag:

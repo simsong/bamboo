@@ -35,11 +35,11 @@ class SourceOptions:
         self.score = DEFAULT_SCORE
         self.frameWidth = None
         self.frameHeight = None
-        for (k,v) in kwargs:
+        for (k,v) in kwargs.items():
             setattr(self,k,v)
 
 
-def FrameFromFile(path, o=SourceOptions()):
+def FrameFromFile(path, o:SourceOptions=SourceOptions()):
     if o.mime_type is None:
         o.mine_type = mimetypes.guess_type(path)[0].split("/")[0]
     if o.mime_type == 'image':
@@ -54,7 +54,7 @@ def FrameFromFile(path, o=SourceOptions()):
                               src=pathlib.Path(absolute_path_string).as_uri() + "?frame="+ct)
 
 
-def FrameStream(root, o=SourceOptions()):
+def FrameStream(root, o:SourceOptions=SourceOptions()):
     """Generator for a series of Frame() objects from a disk file.
     Returns frames in sort order within each directory"""
     if os.path.isdir(root):
@@ -76,7 +76,7 @@ def FrameStream(root, o=SourceOptions()):
     else:
         yield Frame(path=root)
 
-def DissimilarFrameStream(root, o=SourceOptions):
+def DissimilarFrameStream(root, o=SourceOptions()):
     ref = None
     count = 0
     for f in FrameStream(root):
@@ -88,6 +88,7 @@ def DissimilarFrameStream(root, o=SourceOptions):
         except FileNotFoundError as e:
             print(f"Cannot read '{f.path}': {e}",file=sys.stderr)
             continue
+        print("st=",st,"o.score=",o.score)
         if st < o.score:
             yield f
             ref = f
@@ -96,7 +97,7 @@ def DissimilarFrameStream(root, o=SourceOptions):
             logging.debug("count=%s skip %s",count,f)
 
 
-def CameraFrameStream(camera=0, o=SourceOptions()):
+def CameraFrameStream(camera=0, o:SourceOptions=SourceOptions()):
     # https://docs.opencv.org/3.4/dd/d01/group__videoio__c.html
     cap = cv2.VideoCapture(camera)
     if o.frameWidth is not None:
@@ -110,11 +111,12 @@ def CameraFrameStream(camera=0, o=SourceOptions()):
         yield Frame(src=f"camera{camera}")
 
 def TagsFromDirectory(path):
+    logging.debug("path=%s",path)
     for (dirpath, dirnames, filenames) in os.walk(path):
-        for name in os.listdir(path):
-            dirnames.sort()                                  # makes the directories recurse in sort order
-            for fname in sorted(filenames):
-                if name.endswith(".tag"):
-                    with open( os.path.join(dirpath, name), "rb") as f:
-                        v = pickle.load(f)
-                        yield v
+        logging.debug("dirpath=%s",path)
+        dirnames.sort()                                  # makes the directories recurse in sort order
+        for fname in sorted(filenames):
+            if fname.endswith(".tag"):
+                with open( os.path.join(dirpath, fname), "rb") as f:
+                    v = pickle.load(f)
+                    yield v

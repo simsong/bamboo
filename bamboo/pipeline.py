@@ -77,5 +77,5 @@ class SingleThreadedPipeline(Pipeline):
                 (s,f) = self.queued_output_stage_frame_pairs.popleft()
             except IndexError:
                 break
-            logging.debug("%s processing %s",s,f)
+            logging.debug("<%s> processing %s",s.__class__.__name__,f)
             s._run_frame(f)
