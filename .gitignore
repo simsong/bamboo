@@ -176,3 +176,6 @@ out
 data
 facedir
 hosts
+*.html
+*tags/
+*dir/

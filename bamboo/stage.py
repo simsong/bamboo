@@ -13,7 +13,7 @@ import pickle
 from abc import ABC,abstractmethod
 from filelock import FileLock
 
-from .frame import Frame
+from .frame import Frame,FrameTagDict
 
 DEFAULT_JPG_TEMPLATE="frame{counter:08}.jpg"
 
@@ -107,17 +107,15 @@ class WriteFramesToDirectory(Stage):
         self.root     = root
         self.counter  = 0
         self.template = template
-        self.dirsmade = set()
 
     def process(self, f:Frame):
         f = f.copy()
         f.path = os.path.join(self.root, self.template.format(counter=self.counter))
         # make sure directory exists
         dirname = os.path.dirname(f.path)
-        if dirname not in self.dirsmade:
-            os.makedirs( dirname , exist_ok=True )
-            self.dirsmade.add(dirname)
-        # Save and incrementa counter
+        os.makedirs( dirname , exist_ok=True )
+
+        # Save and increment counter
         try:
             f.save(f.path)
         except FileNotFoundError as e:

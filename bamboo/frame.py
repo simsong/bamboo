@@ -25,6 +25,7 @@ import hashlib
 
 from .constants import C
 from .image_utils import img_sim
+from .storage import bamboo_load, bamboo_save
 
 MAXSIZE_CACHE=128
 DEFAULT_JPEG_QUALITY = 90
@@ -70,6 +71,9 @@ def similarity_for_two(t):
     return (t[0],t[1],img_sim(t[2],t[3]))
 
 
+P_PATH = 'path'
+P_CROP = 'crop'
+
 class Frame:
     """Abstraction to hold an image frame.
     If a stage modifies a Frame, it needs to make a copy first."""
@@ -77,8 +81,10 @@ class Frame:
     def __init__(self, *, path=None, img=None, src=None, mime_type=None):
         self.path = path        # if read or written to a file, the path
         self.uri  = None        # the full uri; to replace path
-        self.provenance = []    # what was done to this frame
-        self.src  = src
+        if src is not None:
+            self.history = copy.copy(src.history)
+        else:
+            self.history  = [(P_PATH,path)]          # new history
         self.tags = []
         self.tags_added = 0
 
@@ -92,7 +98,6 @@ class Frame:
 
         # Set the timestamp
         if path is not None:
-            self.src = path
             try:
                 self.mtime = datetime.fromisoformat( os.path.splitext(os.path.basename(path))[0] )
             except ValueError:
@@ -103,15 +108,16 @@ class Frame:
     def __lt__(self, b):
         return  self.mtime < b.mtime
     def __repr__(self):
-        return f"<Frame path={self.path} src={self.src} tags={[tag.tag_type for tag in self.tags]}>"
+        return f"<Frame path={self.path} history={self.history} tags={[tag.tag_type for tag in self.tags]}>"
 
     def save(self, fname):
         try:
-            r = cv2.imwrite(fname, self.img)
+            byte_array,r = cv2.imencode(self.img)
         except cv2.error as e:
-            raise FileNotFoundError(f"could not write image: {fname}") from e
+            raise FileNotFoundError(f"could not encode image: {fname}") from e
         if r is False:
-            raise FileNotFoundError(f"could not write image: {fname}")
+            raise FileNotFoundError(f"could not encode image: {fname}")
+        bamboo_save(fname, byte_array)
 
     def copy(self):
         """Returns a copy, but with the original img and tags. Setting a tag makes that copy.
@@ -149,7 +155,7 @@ class Frame:
         if title is None:
             title = self.path
         if title is None:
-            title = self.src
+            title = str(self.history[0])
         if title is None:
             title = ""
         if i is None:
@@ -206,19 +212,19 @@ class Frame:
         return img_sim(self.img, i2.img)
 
     def crop(self, *, xy, w, h):
-        """Return a new Frame that is the old one cropped"""
+        """Return a new Frame that is the old one cropped. So copy over the provenance."""
         cf = CroppedFrame(src=self, xy=xy, w=w, h=h)
         return cf
 
 class CroppedFrame(Frame):
     def __init__(self, *, src, xy, w, h):
-        super().__init__()
-        self.src = f"Cropped from {self.src}"
+        super().__init__(src=src)
         self.w_ = w
         self.h_ = h
         # This is weird, but correct.
         # Slice order is y,x but the point stores x at xy[0].
         self.img_ = np.copy(src.img[xy[1]:xy[1]+h, xy[0]:xy[0]+w])
+        self.history.append((P_CROP, (xy,(w,h))))
 
 class Tag:
     def __init__(self, tag_type, **kwargs):
@@ -239,4 +245,4 @@ class Patch(Tag):
         super().__init__(tag_type, **kwargs)
 
 def FrameTagDict(f,t):
-    return {'path':f.path, 'src':f.src, 'tag':tag}
+    return {'path':f.path, 'history':f.history, 'tag':t}

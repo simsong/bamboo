@@ -48,6 +48,9 @@ clean:
 eslint:
 	(cd static;make eslint)
 
+pytest:
+	$(PYTHON) -m pytest bamboo/tests
+
 debug:
 	$(PYTHON) flask --app flask_app run --debug
 

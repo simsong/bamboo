@@ -2,7 +2,6 @@
 Dump the contents of a file as pickles
 """
 
-import os
 import pickle
 import json
 
