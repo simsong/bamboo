@@ -65,6 +65,10 @@ debug:
 	$(PYTHON) flask --app flask_app run --debug
 
 
+eslint:
+	(cd static;make eslint)
+	(cd templates;make eslint)
+
 ################################################################
 # Installations are used by the CI pipeline:
 # Generic:
