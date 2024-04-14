@@ -8,31 +8,19 @@ import configparser
 import subprocess
 import socket
 import logging
-import json
 import re
 import glob
 
 import uuid
 
-from tabulate import tabulate
-from pronounceable import generate_word
-
 import paths
-
-from constants import C
 
 # pylint: disable=no-member
 
-import db
-import db_object
-import tracker
-import auth
-from paths import TEMPLATE_DIR, SCHEMA_FILE, TEST_DATA_DIR, SCHEMA_TEMPLATE, SCHEMA1_FILE
+from paths import TEMPLATE_DIR, SCHEMA_FILE, SCHEMA_TEMPLATE, SCHEMA1_FILE
 from lib.ctools import clogging
 from lib.ctools import dbfile
 from lib.ctools.dbfile import MYSQL_HOST,MYSQL_USER,MYSQL_PASSWORD,MYSQL_DATABASE,DBMySQL
-
-import mailer
 
 assert os.path.exists(TEMPLATE_DIR)
 
@@ -132,6 +120,16 @@ def createdb(*,droot, createdb_name, write_config_fname, schema):
         prn(MYSQL_PASSWORD, dbwriter_password)
         prn(MYSQL_DATABASE, createdb_name)
 
+def current_source_schema():
+    """Returns the current schema of the app based on the highest number schema file"""
+    glob_template = SCHEMA_TEMPLATE.format(schema='*')
+    pat = re.compile("([0-9]+)[.]sql")
+    ver = 0
+    for p in glob.glob(glob_template):
+        m = pat.search(p)
+        ver = max( int(m.group(1)), ver)
+    return ver
+
 def schema_upgrade( ath, dbname ):
     """Upgrade the schema to the current version.
     NOTE: uses ath to create a new database connection. ath must have ability to modify database schema.
@@ -189,10 +187,6 @@ if __name__ == "__main__":
     clogging.add_argument(parser, loglevel_default='WARNING')
     args = parser.parse_args()
     clogging.setup(level=args.loglevel)
-
-    if args.mailer_config:
-        print("mailer config:",mailer.smtp_config_from_environ())
-        sys.exit(0)
 
     if args.readconfig:
         paths.CREDENTIALS_FILE = paths.AWS_CREDENTIALS_FILE = args.readconfig

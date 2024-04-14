@@ -6,7 +6,6 @@ A simple pipeline to extract all of the faces from a set of photos, write them t
 import os
 import math
 import logging
-import json
 
 from collections import defaultdict
 
@@ -42,7 +41,7 @@ def any_nan(vect):
             return True
     return False
 
-def cluster_faces(*, rootdir, facedir, tagdir, dump, show):
+def cluster_faces(*, rootdir, facedir, tagdir, show):
 
     os.makedirs(tagdir, exist_ok=True)
 
@@ -141,4 +140,4 @@ if __name__=="__main__":
 
     if args.rootdir and not args.facedir:
         raise RuntimeError("--add requires --facedir")
-    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.dagdir, dump=args.dump, show=args.show)
+    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.dagdir, show=args.show)
