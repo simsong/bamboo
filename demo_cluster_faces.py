@@ -80,15 +80,17 @@ def cluster_faces(*, rootdir, facedir, tagdir, dump, show):
     X = np.array(embeddings)
 
     # Step 2: Perform DBSCAN clustering
+
     # Note: DBSCAN expects a distance matrix for the metric='precomputed',
     # so we use cosine_distances to compute the distance matrix from our embeddings
-    # DBSCAN parameters like eps and min_samples can be adjusted based on your specific dataset and needs
+    # DBSCAN parameters like eps and min_samples can be adjusted based on your
+    # specific dataset and needs
     with timer.Timer("time to cluster"):
         dbscan = DBSCAN(eps=0.5, min_samples=2, metric='precomputed')
         clusters = dbscan.fit_predict(cosine_distances(X))
 
     maxcluster = max(clusters)
-    print("cluster count:","max:",maxcluster)
+    print("cluster count:",maxcluster)
 
     # Assign each tag to its cluster
     ftdict = defaultdict(list)
@@ -98,6 +100,8 @@ def cluster_faces(*, rootdir, facedir, tagdir, dump, show):
         ftdict[cluster].append(frametag)
 
 
+    MAX_IMAGES_PER_CLUSTER = 5
+    # Generate the HTML page
     with open("cluster.html","w") as c:
         c.write(HTML_HEAD)
         for cl in range(maxcluster+1):
@@ -105,7 +109,7 @@ def cluster_faces(*, rootdir, facedir, tagdir, dump, show):
             c.write(f"<h2>Cluster {cl}:</h2>")
             for (ct,frametag) in enumerate(ftdict[cl]):
                 logging.debug("ct=%s frametag=%s",ct,frametag)
-                if ct<5:
+                if ct<MAX_IMAGES_PER_CLUSTER:
                     path = frametag['path']
                     try:
                         src  = frametag['tag'].src
@@ -113,12 +117,12 @@ def cluster_faces(*, rootdir, facedir, tagdir, dump, show):
                         print("no src for:",frametag['tag'])
                         src  = ""
                     c.write(f"<a href='{src}'> <img src='{path}' class='Image'/></a>\n  ")
-                elif ct==5:
+                elif ct==MAX_IMAGES_PER_CLUSTER:
                     c.write("...")
                 else:
                     break
             c.write("<br/><hr/>")
-    abort()
+    # Done!
 
 
 if __name__=="__main__":
@@ -137,5 +141,4 @@ if __name__=="__main__":
 
     if args.rootdir and not args.facedir:
         raise RuntimeError("--add requires --facedir")
-
     cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.dagdir, dump=args.dump, show=args.show)
