@@ -80,11 +80,14 @@ install-chromium-browser-macos: $(REQ)
 	brew install chromium --no-quarantine
 
 # Includes ubuntu dependencies
-install-linux: $(REQ)
+install-ubuntu: $(REQ)
 	echo on GitHub, we use this action instead: https://github.com/marketplace/actions/setup-ffmpeg
 	which ffmpeg || sudo apt install ffmpeg
+	which node || sudo apt-get install nodejs
+	which npm || sudo apt-get install npm
+	npm ci
 	$(PYTHON) -m pip install --upgrade pip
-	if [ -r requirements-linux.txt ]; then $(PIP_INSTALL) -r requirements-linux.txt ; else echo no requirements-linux.txt ; fi
+	if [ -r requirements-ubuntu.txt ]; then $(PIP_INSTALL) -r requirements-ubuntu.txt ; else echo no requirements-ubuntu.txt ; fi
 	if [ -r requirements.txt ];        then $(PIP_INSTALL) -r requirements.txt ; else echo no requirements.txt ; fi
 
 # Includes MacOS dependencies managed through Brew
