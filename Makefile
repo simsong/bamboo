@@ -52,7 +52,7 @@ eslint:
 	(cd static;make eslint)
 
 pytest:
-	$(PYTHON) -m pytest bamboo/tests
+	$(PYTHON) -m pytest bamboo/tests tests
 
 pytest-debug:
 	$(PYTHON) -m pytest -v --log-cli-level=DEBUG
