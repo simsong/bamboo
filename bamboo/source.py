@@ -30,13 +30,25 @@ from .image_utils import img_sim
 
 DEFAULT_SCORE = 0.90
 class SourceOptions:
-    __slots__=('limit','sampling','mime_type','score','frameWidth','frameHeight')
+    __slots__=('limit','sampling','mime_type','score','frameWidth','frameHeight','counter')
     def __init__(self,**kwargs):
+        self.limit = None
+        self.sampling = 1.0     # fraction we keep
         self.score = DEFAULT_SCORE
         self.frameWidth = None
         self.frameHeight = None
+        self.counter = 0
         for (k,v) in kwargs.items():
             setattr(self,k,v)
+
+    def draw(self):
+        """Return True if we should sample."""
+        return self.samplings >= random.random()
+
+    def atlimit(self):
+        """Increment counter and return True if we are at the limit."""
+        self.counter += 1
+        return (self.limit is not None) and (self.counter >= self.limit)
 
 
 def FrameFromFile(path, o:SourceOptions=SourceOptions()):
@@ -50,8 +62,11 @@ def FrameFromFile(path, o:SourceOptions=SourceOptions()):
             ret, img = cap.read()
             if not ret:
                 break
-            yield frame.Frame(img = img,
-                              src=pathlib.Path(absolute_path_string).as_uri() + "?frame="+ct)
+            if o.draw():
+                yield frame.Frame(img = img,
+                                  src=pathlib.Path(absolute_path_string).as_uri() + "?frame="+ct)
+                if o.atlimit():
+                    return
 
 
 def FrameStream(root, o:SourceOptions=SourceOptions()):
@@ -65,21 +80,25 @@ def FrameStream(root, o:SourceOptions=SourceOptions()):
                 if mtype is None:
                     continue
                 if mtype.split("/")[0] in ['video','image']:
-                    path = os.path.join(dirpath, fname)
-                    if os.path.getsize(path)>0:
-                        try:
-                            f = Frame(path=path, mime_type=mtype)
-                        except FileNotFoundError as e:
-                            print(f"Cannot read '{path}': {e}",file=sys.stderr)
-                            continue
-                        yield f
+                    if o.draw():
+                        path = os.path.join(dirpath, fname)
+                        if os.path.getsize(path)>0:
+                            try:
+                                f = Frame(path=path, mime_type=mtype)
+                            except FileNotFoundError as e:
+                                print(f"Cannot read '{path}': {e}",file=sys.stderr)
+                                continue
+                            yield f
+                            if o.atlimit():
+                                return
+
     else:
         yield Frame(path=root)
 
 def DissimilarFrameStream(root, o=SourceOptions()):
     ref = None
     count = 0
-    for f in FrameStream(root):
+    for f in FrameStream(root): # do not pass options
         try:
             st = f.similarity(ref)
         except cv2.error as e: # pylint: disable=catching-non-exception
@@ -90,7 +109,10 @@ def DissimilarFrameStream(root, o=SourceOptions()):
             continue
         print("st=",st,"o.score=",o.score)
         if st < o.score:
-            yield f
+            if o.draw():
+                yield f
+            if o.atlimit():
+                return
             ref = f
         else:
             count += 1
@@ -108,9 +130,12 @@ def CameraFrameStream(camera=0, o:SourceOptions=SourceOptions()):
         ret, img = cap.read()
         if not ret:
             break
-        yield Frame(src=f"camera{camera}")
+        if o.draw():
+            yield Frame(src=f"camera{camera}")
+        if o.atlimit():
+            return
 
-def TagsFromDirectory(path):
+def TagsFromDirectory(path, o:SourceOptions=SourceOptions()):
     logging.debug("path=%s",path)
     for (dirpath, dirnames, filenames) in os.walk(path):
         logging.debug("dirpath=%s",path)
@@ -119,4 +144,7 @@ def TagsFromDirectory(path):
             if fname.endswith(".tag"):
                 with open( os.path.join(dirpath, fname), "rb") as f:
                     v = pickle.load(f)
-                    yield v
+                    if o.draw():
+                        yield v
+                    if o.atlimit():
+                        return

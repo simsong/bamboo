@@ -179,3 +179,5 @@ hosts
 *.html
 *tags/
 *dir/
+*.json
+*.cut
