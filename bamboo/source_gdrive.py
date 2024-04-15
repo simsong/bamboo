@@ -75,10 +75,10 @@ GOOGLE_TYPES = {"application/vnd.google-apps.document":"gdoc",
 # See https://developers.google.com/drive/api/v3/reference/files
 # Note that spaces seem to matter
 GFILE_QUERIES = [ ('all reachable images',
-                   {'corpus':'user', 'includeItemsFromAllDrives':True , 'supportsAllDrives':True, 'supportsTeamDrives':True},
+                   {'corpus':'user', 'includeItemsFromAllDrives':True , 'supportsAllDrives':True},
                    "(mimeType='image/jpeg') or (mimeType='image/png') or (mimeType='image/tiff') or (mimeType='image/webp')"),
                   ('all reachable movies',
-                   {'corpus':'user', 'includeItemsFromAllDrives':True , 'supportsAllDrives':True, 'supportsTeamDrives':True},
+                   {'corpus':'user', 'includeItemsFromAllDrives':True , 'supportsAllDrives':True},
                    "(mimeType='video/mp4') or (mimeType='video/webm') or (mimeType='video/x-msvideo') or (mimeType='video/quicktime') or (mimeType='video/ogg')"),
                  ]
 
@@ -157,7 +157,8 @@ def cache_all_drives(creds):
 @functools.lru_cache(maxsize=128)
 def get_obj(creds, fileId):
     """Just return the name of a Id"""
-    f = build('drive', 'v3', credentials=creds).files().get(fileId=fileId, fields=",".join(DEFAULT_FILE_FIELDS+['parents']), supportsAllDrives=True, supportsTeamDrives=True).execute()
+    f = build('drive', 'v3', credentials=creds).files().get(fileId=fileId, fields=",".join(DEFAULT_FILE_FIELDS+['parents']),
+                                                            supportsAllDrives=True).execute()
     return f
 
 def name(creds, fileId):
@@ -188,7 +189,7 @@ def full_path(creds, fileId, depth=0):
 
     return full_path(creds, parentId, depth=depth+1) + "/" + name(creds, fileId)
 
-def gfiles_list(creds, q, *, extra_args={}, extra_fields=[]):
+def gfiles_list(creds, *, q=None, extra_args={}, extra_fields=[]):
     """Return a generator that of all items that match a query. A list of queries is above in GFILES_QUERIES, or you can make your own!
     https://developers.google.com/drive/api/reference/rest/v2/files
 
@@ -203,8 +204,9 @@ def gfiles_list(creds, q, *, extra_args={}, extra_fields=[]):
     while True:
         default_args = {'pageSize':DEFAULT_PAGE_SIZE,
                         'pageToken':pageToken,
-                        'q':q,
                         'fields':f'nextPageToken, files({file_fields})'}
+        if q is not None:
+            default_args['q']=q
         try:
             results = files.list(**{**default_args,**extra_args}).execute()
         except googleapiclient.errors.HttpError as e:
@@ -240,18 +242,16 @@ def gdrive_walk(creds, dirId, path='', extra_fields=[]):
         yield from gdrive_walk(creds, folder['id'], path+"/"+folder['name'], extra_fields=extra_fields)
 
 
-def GoogleDriveFrameStream():
-    pass
-
 def print_obj(creds, obj, print_path=False):
     if print_path:
         print( full_path(creds, obj['id']))
     print(obj)
     print("")
 
-def print_objs(objs, print_path=False):
-    for obj in objs:
-        print_obj(obj, print_path=print_path)
+def GoogleDriveFrameStream(*,driveId=None,folderId=None):
+    """Provide all of the images on the named drive or folder"""
+    if driveId is not None:
+        print("driveId",driveId)
 
 
 if __name__=="__main__":
@@ -263,7 +263,9 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser(description="Obtain OAuth2 credentials and list available Google Drives.",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
+    parser.add_argument( '--listmydrive', help='List the contents of myDrive', action='store_true')
     parser.add_argument( '--listdrives', help='List drives', action='store_true')
+    parser.add_argument( '--listdrive', help='List the contents of a drive')
     parser.add_argument( '--listfolder', help='List contents of a folder Id')
     parser.add_argument( '--client_secret', default=APP_CREDENTIALS_FILENAME)
     parser.add_argument( '--oauth', default=OAUTH_TOKEN_FILENAME)
@@ -281,13 +283,28 @@ if __name__=="__main__":
     if args.path:
         cache_all_drives(creds)
 
-
     if args.listdrives:
-        print_objs( sorted(list_drives(creds), key=lambda k:k['name']) )
+        for obj in sorted(list_drives(creds), key=lambda k:k['name']):
+            print_obj(creds, obj)
 
     if args.shared:
         for obj in list_folders(creds):
             print_obj(creds, obj, print_path=args.path)
+
+    if args.listmydrive:
+        for obj in list_drives(creds, q=f"driveID='{args.listmydrive}' and trashed=false"):
+            print_objs(creds,obj)
+
+    if args.listdrive:
+        driveId=args.listdrive
+        print("driveId=",driveId)
+        for obj in gfiles_list(creds,
+                               extra_args={'corpora':'drive',
+                                           'driveId':driveId,
+                                           'includeItemsFromAllDrives':True,
+                                           'supportsAllDrives':True}):
+            print_obj(creds, obj, print_path=args.path)
+
 
     if args.listfolder:
         for obj in gfiles_list(creds, q = f"'{args.listfolder}' in parents "):

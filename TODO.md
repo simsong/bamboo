@@ -47,3 +47,46 @@ A view that allows all unknown guests to be matched with a profile or added to a
 List of all visitors each day who are not badged accelerator users
 A way to set up alerts that someone is desirable or undesirable is in the space
 A way to alert when an unknown vehicle is parked in a Basis parking space
+
+
+# Ideas
+Make google drive files sharable, get a URL, and then make it not sharable:
+
+from Gemini:
+```
+import time
+import httplib2
+from apiclient import discovery
+from oauth2client.service_account import ServiceAccountCredentials
+
+# Set up authentication
+scopes = ['https://www.googleapis.com/auth/drive']
+credentials = ServiceAccountCredentials.from_json_keyfile_name('your_credentials.json', scopes=scopes)  # Replace 'your_credentials.json' with your file
+http = credentials.authorize(httplib2.Http())
+drive_service = discovery.build('drive', 'v3', http=http)
+
+def change_permissions_and_revert(file_id, minutes_open=5):
+    # Step 1: Get previous permissions
+    original_permissions = drive_service.permissions().list(fileId=file_id).execute().get('permissions', [])
+
+    # Step 2: Change to public
+    new_permission = {'role': 'reader', 'type': 'anyone'}
+    drive_service.permissions().create(fileId=file_id, body=new_permission).execute()
+
+    # Step 3: Wait for the specified time
+    time.sleep(minutes_open * 60)
+
+    # Step 4: Revert permissions
+    for permission in original_permissions:
+        try:
+            drive_service.permissions().update(fileId=file_id, permissionId=permission['id'], body=permission).execute()
+        except errors.HttpError as error:
+            # Handle potential errors during permissions update
+            print(f'Error restoring permission: {error}')
+
+# Example Usage
+file_id = 'your_google_drive_file_id'  # Replace with the actual file ID
+change_permissions_and_revert(file_id)
+```
+
+- [ ] Access Google Photos with Google Photos API.
