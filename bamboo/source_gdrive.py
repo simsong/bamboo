@@ -79,7 +79,7 @@ GFILE_QUERIES = [ ('all reachable images',
                    "(mimeType='image/jpeg') or (mimeType='image/png') or (mimeType='image/tiff') or (mimeType='image/webp')"),
                   ('all reachable movies',
                    {'corpus':'user', 'includeItemsFromAllDrives':True , 'supportsAllDrives':True, 'supportsTeamDrives':True},
-                   "(mimeType='image/jpeg') or (mimeType='image/png') or (mimeType='image/tiff') or (mimeType='image/webp')"),
+                   "(mimeType='video/mp4') or (mimeType='video/webm') or (mimeType='video/x-msvideo') or (mimeType='video/quicktime') or (mimeType='video/ogg')"),
                  ]
 
 FOLDER_MIME_TYPE      = "application/vnd.google-apps.folder"
@@ -175,27 +175,30 @@ def parent_id(creds, fileId):
         return None
 
 @functools.lru_cache(maxsize=128)
-def full_path(creds, fileId):
+def full_path(creds, fileId, depth=0):
     parentId = parent_id(creds, fileId)
     if parentId is None:
-        # Get the drive name if we can find it
-        try:
-            return "[" + known_drives[fileId]['name'] + "]"
-        except KeyError:
-            return "[unknown]"
-    return full_path(creds, parentId) + "/" + name(creds, fileId)
+        if depth>0:
+            try:
+                return "[" + known_drives[fileId]['name'] + "]"
+            except KeyError:
+                return "[unknown drive]"
+        else:
+            return "[unknown parent] " + name(creds, fileId)
 
-def gfiles_list(creds, q, *, extra_args={}, file_fields_add=[]):
+    return full_path(creds, parentId, depth=depth+1) + "/" + name(creds, fileId)
+
+def gfiles_list(creds, q, *, extra_args={}, extra_fields=[]):
     """Return a generator that of all items that match a query. A list of queries is above in GFILES_QUERIES, or you can make your own!
     https://developers.google.com/drive/api/reference/rest/v2/files
 
     :param: extra_args is extra arguments for the files.list() API call
-    :param: file_fields_add is fields to add beyond those in DEFAULT_FILE_FIELDS (id, name, mimeType)
+    :param: extra_fields is fields to add beyond those in DEFAULT_FILE_FIELDS (id, name, mimeType)
     """
     drive = build('drive', 'v3', credentials=creds)
     drives = drive.drives()
     files  = drive.files()
-    file_fields = ",".join(set(DEFAULT_FILE_FIELDS + file_fields_add))
+    file_fields = ",".join(set(DEFAULT_FILE_FIELDS + extra_fields))
     pageToken = None
     while True:
         default_args = {'pageSize':DEFAULT_PAGE_SIZE,
@@ -224,17 +227,17 @@ def list_folders(creds):
 ################################################################
 ###
 
-def gdrive_walk(creds, dirId, path='', file_fields_add=[]):
+def gdrive_walk(creds, dirId, path='', extra_fields=[]):
     """Similar to os.path.walk(), except returns (root, files, dirs) for a google directory, recursively down."""
     if path=='':
         path = name(creds, dirId)
-    all     = list( gfiles_list(creds, q=f"('{dirId}' in parents)", file_fields_add=file_fields_add))
+    all     = list( gfiles_list(creds, q=f"('{dirId}' in parents)", extra_fields=extra_fields))
     folders = [ item for item in all if item.get('mimeType',None)==FOLDER_MIME_TYPE]
     files   = [ item for item in all if item.get('mimeType',None)!=FOLDER_MIME_TYPE]
 
     yield (path, folders, files)
     for folder in folders:
-        yield from gdrive_walk(creds, folder['id'], path+"/"+folder['name'], file_fields_add=file_fields_add)
+        yield from gdrive_walk(creds, folder['id'], path+"/"+folder['name'], extra_fields=extra_fields)
 
 
 def GoogleDriveFrameStream():
@@ -302,7 +305,7 @@ if __name__=="__main__":
         else:
             (n,a,q) = GFILE_QUERIES[args.query-1]
             print(n,"---",q)
-            for obj in gfiles_list(creds, q=q, extra_args=a):
+            for obj in gfiles_list(creds, q=q, extra_fields=['size'], extra_args=a):
                 print_obj(creds, obj, print_path=args.path)
 
     if args.walk:
