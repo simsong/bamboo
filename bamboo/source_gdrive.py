@@ -164,8 +164,8 @@ DEFAULT_FILE_FIELDS = ['id','name','owners','mimeType']
 def list_folders(creds):
     """Generator that returns all folders shared with the user, each as a dictionary that contains
     ['name'] and ['id']"""
-    for obj in gfiles_list(creds, q=FOLDERS_SHARED_WITH_ME):
-        yield obj
+    yield from gfiles_list(creds, q=FOLDERS_SHARED_WITH_ME)
+
 
 def print_objs(objs):
     for obj in objs:
@@ -189,8 +189,8 @@ def name(creds, fileId):
     file = build('drive', 'v3', credentials=creds).files().get(fileId=fileId).execute()
     return file['name']
 
-def walk(creds, dirId, path='', file_fields_add=[]):
-    """Similar to os.path.walk(), except returns (root, files, dirs) for a google directory."""
+def gdrive_walk(creds, dirId, path='', file_fields_add=[]):
+    """Similar to os.path.walk(), except returns (root, files, dirs) for a google directory, recursively down."""
     if path=='':
         path = name(creds, dirId)
     all     = list( gfiles_list(creds, q=f"('{dirId}' in parents)", file_fields_add=file_fields_add))
@@ -199,7 +199,7 @@ def walk(creds, dirId, path='', file_fields_add=[]):
 
     yield (path, folders, files)
     for folder in folders:
-        yield from walk(creds, folder['id'], path+"/"+folder['name'], file_fields_add=file_fields_add)
+        yield from gdrive_walk(creds, folder['id'], path+"/"+folder['name'], file_fields_add=file_fields_add)
 
 
 def GoogleDriveFrameStream():
@@ -215,7 +215,7 @@ if __name__=="__main__":
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument( '--drives', help='List drives', action='store_true')
-    parser.add_argument( '--listfolder', help='List files in a folder Id')
+    parser.add_argument( '--listfolder', help='List contents of a folder Id')
     parser.add_argument( '--client_secret', default=APP_CREDENTIALS_FILENAME)
     parser.add_argument( '--shared', help='List folders shared with you', action='store_true')
     parser.add_argument( '--limit', help='Limit to this many outputs', type=int)
@@ -234,9 +234,8 @@ if __name__=="__main__":
         for obj in gfiles_list(creds, q = f"'{args.listfolder}' in parents "):
             print(obj)
 
-
     if args.walk:
-        for (path, folders, files) in walk(creds, args.walk):
+        for (path, folder_objs, file_objs) in gdrive_walk(creds, args.walk):
             print("Path:",path)
-            for fname in files:
-                print("   ",os.path.join(path,fname))
+            for file_obj in file_objs:
+                print("   ",path,file_obj)
