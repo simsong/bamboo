@@ -307,7 +307,12 @@ if __name__=="__main__":
 
 
     if args.listfolder:
-        for obj in gfiles_list(creds, q = f"'{args.listfolder}' in parents "):
+        folderId = args.listfolder
+        print("folderId=",folderId)
+        for obj in gfiles_list(creds, q = f"'{folderId}' in parents ",
+                               extra_args={'corpora':'allDrives',
+                                           'includeItemsFromAllDrives':True,
+                                           'supportsAllDrives':True}):
             print_obj(creds, obj, print_path=args.path)
 
     if args.q:
