@@ -102,7 +102,9 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaIoBaseDownload
 import googleapiclient.errors
+import io
 
 from google_auth_oauthlib.flow import InstalledAppFlow
 
@@ -157,9 +159,23 @@ def cache_all_drives(creds):
 @functools.lru_cache(maxsize=128)
 def get_obj(creds, fileId):
     """Just return the name of a Id"""
-    f = build('drive', 'v3', credentials=creds).files().get(fileId=fileId, fields=",".join(DEFAULT_FILE_FIELDS+['parents']),
-                                                            supportsAllDrives=True).execute()
-    return f
+    return build('drive', 'v3', credentials=creds).files().get(fileId=fileId,
+                                                               fields=",".join(DEFAULT_FILE_FIELDS+['parents']),
+                                                               supportsAllDrives=True).execute()
+def get_media(creds,fileId):
+    request =  build('drive', 'v3', credentials=creds).files().get_media(fileId=fileId, supportsAllDrives=True)
+    file = io.BytesIO()
+    downloader = MediaIoBaseDownload(file, request)
+    done = False
+    try:
+        while done is False:
+            status, done = downloader.next_chunk()
+            print(f"Download {int(status.progress() * 100)}.",file=sys.stderr)
+    except HttpError as e:
+        print(f"An error occurred: {error}",file=sys.stderr)
+        file = None
+    return file.getvalue()
+
 
 def name(creds, fileId):
     """Just return the name of a Id"""
@@ -274,11 +290,18 @@ if __name__=="__main__":
     parser.add_argument( '--walk', help='walk the provided Id recursively')
     parser.add_argument( '--query', help='Run one of the numbered queries. Specify 0 to list all the queries',type=int)
     parser.add_argument( '--path', help='When printing an object, display its full path', action='store_true')
+    parser.add_argument( '--cat', help='Copy a fileId to stdout')
     parser.add_argument( '--q', help='Specify a query')
     parser.add_argument( 'Ids', help='Ids that you want to list', nargs='*')
 
     args = parser.parse_args()
     creds = get_app_credentials(client_secret=args.client_secret, oauth_token_filename=args.oauth)
+
+    if args.cat:
+        obj = get_media(creds, args.cat)
+        with open("/dev/stdout","wb") as f:
+            f.write(obj)
+
 
     if args.path:
         cache_all_drives(creds)
