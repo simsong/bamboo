@@ -65,10 +65,6 @@ debug:
 	$(PYTHON) flask --app flask_app run --debug
 
 
-eslint:
-	(cd static;make eslint)
-	(cd templates;make eslint)
-
 ################################################################
 # Installations are used by the CI pipeline:
 # Generic:
@@ -124,3 +120,8 @@ coverage:
 	$(PYTHON) -m pip install --upgrade pip
 	$(PIP_INSTALL) codecov pytest pytest_cov
 	$(PYTHON) -m pytest -v --cov=. --cov-report=xml tests
+
+
+# https://stackoverflow.com/questions/2720014/how-to-upgrade-all-python-packages-with-pip
+pip-upgrade-outdated:
+	$(PYTHON) -m pip --disable-pip-version-check list --outdated --format=json | $(PYTHON) -c "import json, sys; print('\n'.join([x['name'] for x in json.load(sys.stdin)]))" | xargs -n1 $(PYTHON) -m pip install -U

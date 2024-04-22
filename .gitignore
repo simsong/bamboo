@@ -181,3 +181,5 @@ hosts
 *dir/
 *.json
 *.cut
+*.ini
+**/*.ini

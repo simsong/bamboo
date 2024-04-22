@@ -139,3 +139,7 @@ Do we want to have an abstract pipeline object?
 
 # See Also
 * https://universe.roboflow.com/ - "The world's largest collection of open source computer vision datasets and APIs." (Unfortunately, no consistent API).
+* https://dl.acm.org/doi/10.1145/2393347.2393394
+* https://dl.acm.org/doi/10.1145/2733373.2806229
+* https://ieeexplore.ieee.org/document/7225141
+* https://ieeexplore.ieee.org/document/8438958

@@ -302,7 +302,6 @@ if __name__=="__main__":
         with open("/dev/stdout","wb") as f:
             f.write(obj)
 
-
     if args.path:
         cache_all_drives(creds)
 
