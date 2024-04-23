@@ -19,6 +19,7 @@ import copy
 import mimetypes
 import logging
 import pickle
+import random
 
 import cv2
 import numpy as np
@@ -43,7 +44,7 @@ class SourceOptions:
 
     def draw(self):
         """Return True if we should sample."""
-        return self.samplings >= random.random()
+        return self.sampling >= random.random()
 
     def atlimit(self):
         """Increment counter and return True if we are at the limit."""

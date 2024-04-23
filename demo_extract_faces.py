@@ -6,7 +6,7 @@ We show them for fun!
 
 import os
 from bamboo.pipeline import SingleThreadedPipeline
-from bamboo.stage import ShowTags, WriteFramesToDirectory
+from bamboo.stage import ShowTags, SaveFramesToDirectory
 from bamboo.face_yolo8 import Yolo8FaceTag
 from bamboo.face import ExtractFacesToFrames
 from bamboo.source import FrameStream
@@ -25,6 +25,6 @@ if __name__=="__main__":
     p.addLinearPipeline([ Yolo8FaceTag(),
                           ShowTags(wait=200),
                           ExtractFacesToFrames(scale=1.3),
-                          WriteFramesToDirectory(args.outdir, template="{counter:08}.jpg") ])
+                          SaveFramesToDirectory(args.outdir, template="{counter:08}.jpg") ])
 
     p.process_list( FrameStream( args.root ) )

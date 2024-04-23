@@ -36,7 +36,7 @@ class Pipeline(ABC):
         return (stages[0],stages[-1])
 
     def process(self, f):
-        """Run a frame through the pipeline. This interface will be moved entirely into the pipeline"""
+        """Run a frame through the pipeline."""
         self.count += 1
         self.queue_output_stage_frame_pair( (self.head, f))
         self.run_queue()
@@ -59,6 +59,8 @@ class Pipeline(ABC):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        for stage in self.stages:
+            stage.pipeline_shutdown()
         self.print_stats(out=self.out)
         return self
 

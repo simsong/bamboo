@@ -67,7 +67,11 @@ def deepface_normalization_names():
                 ret.add(m.group(1))
     return ret
 
-
+def any_nan(vect):
+    for v in vect:
+        if math.isnan(v):
+            return True
+    return False
 
 class DeepFaceTag(Stage):
     def __init__(self, embeddings=True, attributes=True,
@@ -99,6 +103,11 @@ class DeepFaceTag(Stage):
                                                      align = True,
                                                      expand_percentage = expand_percentage,
                                                      normalization = self.normalization ):
+
+                # deepface sometimes creates embeddings with nan's.
+                # If we find them, remove them
+                if ('embedding' in found) and any_nan(found['embedding']):
+                    del found['embedding']
 
                 facial_area = found['facial_area']
                 f.add_tag(Tag(TAG_FACE,

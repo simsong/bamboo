@@ -79,7 +79,9 @@ class Frame:
     """Abstraction to hold an image frame.
     If a stage modifies a Frame, it needs to make a copy first."""
     jpeg_quality = DEFAULT_JPEG_QUALITY
-    def __init__(self, *, path=None, img=None, src=None, mime_type=None):
+    FRAME_VERSION = 1
+    def __init__(self, *, path=None, img=None, src=None, mime_type=None, _w=None, _h=None, _depth=None):
+        self.version = self.FRAME_VERSION
         self.path = path        # if read or written to a file, the path
         self.uri  = None        # the full uri; to replace path
         if src is not None:
@@ -90,9 +92,9 @@ class Frame:
         self.tags_added = 0
 
         # These are for overriding the properties
-        self.w_ = None
-        self.h_ = None
-        self.depth_ = None
+        self._w = _w
+        self._h = _h
+        self._depth = _depth
         self.bytes_ = None
         self.img_   = None
         self.mime_type_ = mime_type
@@ -111,7 +113,30 @@ class Frame:
     def __repr__(self):
         return f"<Frame path={self.path} history={self.history} tags={[tag.tag_type for tag in self.tags]}>"
 
+    @property
+    def json(self):
+        """JSON representation of the frame (without the image)."""
+        return json.dumps({'version':self.version,
+                           'path':self.path,
+                           'uri':self.uri,
+                           'history':self.history,
+                           'tags':self.tags,
+                           '_w':self._w,
+                           '_h':self._h,
+                           '_depth':self._depth,
+                           'mime_type_':self.mime_type_})
+
+    @classmethod
+    def fromJSON(cls, str):
+        kwargs = json.loads(str)
+        if kwargs['version']==self.FRAME_VERSION:
+            return Frame(**kwargs)
+        else:
+            raise ValueError(f"Cannot load Frame JSON version {kwargs['version']}")
+
+
     def save(self, path):
+        """Write the image to a file as a JPEG"""
         logging.debug("save path=%s self=%s",path,self)
         bamboo_save(path, self.jpeg_bytes)
         self.history.append((P_PATH,path))
@@ -191,18 +216,18 @@ class Frame:
     @property
     @functools.lru_cache(maxsize=3)
     def w(self):
-        return self.w_ if self.w_ is not None else self.img.shape[1]
+        return self._w if self._w is not None else self.img.shape[1]
 
     @property
     @functools.lru_cache(maxsize=3)
     def h(self):
         """height (y) is the first index in the shape. nparray goes from lsb to msb"""
-        return self.h_  if self.h_  is not None else self.img.shape[0]
+        return self._h  if self._h  is not None else self.img.shape[0]
 
     @property
     @functools.lru_cache(maxsize=3)
     def depth(self):
-        return self.depth_ if self.depth_ is not None else self.img.shape[2]
+        return self._depth if self._depth is not None else self.img.shape[2]
 
     @functools.lru_cache(maxsize=10)
     def similarity(self, i2):
@@ -219,8 +244,8 @@ class Frame:
 class CroppedFrame(Frame):
     def __init__(self, *, src, xy, w, h):
         super().__init__(src=src)
-        self.w_ = w
-        self.h_ = h
+        self._w = w
+        self._h = h
         # This is weird, but correct.
         # Slice order is y,x but the point stores x at xy[0].
         self.img_ = np.copy(src.img[xy[1]:xy[1]+h, xy[0]:xy[0]+w])

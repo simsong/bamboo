@@ -17,7 +17,7 @@ from lib.ctools import clogging
 from lib.ctools import timer
 
 from bamboo.pipeline import SingleThreadedPipeline
-from bamboo.stage import WriteFramesToDirectory,WriteTagsToDirectory,ShowTags,Connect
+from bamboo.stage import SaveFramesToDirectory,ShowTags,Connect,WriteFrameObjectsToDirectory
 from bamboo.face_deepface import DeepFaceTag
 from bamboo.face import ExtractFacesToFrames
 from bamboo.source import DissimilarFrameStream,TagsFromDirectory
@@ -35,11 +35,12 @@ width:128px;
 <body>
 """
 
-def any_nan(vect):
-    for v in vect:
-        if math.isnan(v):
+def frame_has_face_tag_with_embedding(f):
+    for tag in f.tags:
+        if (tag.type==TAG_FACE) and hasattr(tag,'embedding'):
             return True
     return False
+
 
 def cluster_faces(*, rootdir, facedir, tagdir, show):
 
@@ -49,12 +50,28 @@ def cluster_faces(*, rootdir, facedir, tagdir, show):
         """A filter for face tags"""
         return t.tag_type == TAG_FACE
 
+    # If a rootdir was specified, analyze the images and write all of the frames that have
+    # and embedding
     if rootdir:
         with SingleThreadedPipeline() as p:
-            p.addLinearPipeline([ dt:= DeepFaceTag(face_detector='yolov8'),
-                                  ExtractFacesToFrames(scale=1.3),
-                                  WriteFramesToDirectory(root=facedir),
-                                  WriteTagsToDirectory(tagfilter = face_tags, path=tagdir)])
+            p.addLinearPipeline([
+                # For each frame, tag all of the faces:
+                dt:= DeepFaceTag(face_detector='yolov8'),
+
+                # For each tag, create a new frame and send it down the pipeline:
+                ExtractFacesToFrames(scale=1.3),
+
+                # Filter for frames that have a face tag with an embedding
+                FilterFrames(framefilter=frame_has_face_tag_with_embedding),
+
+                # Write the new frames to a directory:
+                SaveFramesToDirectory(root=facedir, fmt='jpeg'),
+
+                # Write the Frame objects in JSON form
+                # This won't include the frame images themselves, but it includes the saved path
+                # from above, so the images can still be displayed.
+                WriteFrameObjectsToDirectory(path=tagdir)
+            ])
 
         if show:
             Connect(dt, ShowTags(wait=200))
@@ -63,17 +80,17 @@ def cluster_faces(*, rootdir, facedir, tagdir, show):
 
     # Now gather all of the paths and embeddings in order
     embeddings = []
-    frametags = []
+    face_frames = []
+    print("Start clustering.")
     with timer.Timer("time to read tags"):
-        for v in TagsFromDirectory(tagdir):
-            # First make sure that none of the embeddings are nan.
-            embedding = v['tag'].embedding
-            if any_nan(embedding):
-                continue
-            frametags.append(v)
-            embeddings.append(embedding)
+        for f in FrameStream(tagdir):
+            embeddings.append( f.findfirst_tag(TAG_FACE).embedding)
+            face_frames.append(f)
 
-    logging.debug("number of embeddings:%s",len(embeddings))
+    # embeddings is now a list of all the valid embeddings
+    # frametags is a list of all the frametagdicts
+
+    logging.debug("number of faces to cluster:%s",len(face_frames))
 
     # Convert list of embeddings to a numpy array for efficient computation
     X = np.array(embeddings)
@@ -91,36 +108,18 @@ def cluster_faces(*, rootdir, facedir, tagdir, show):
     maxcluster = max(clusters)
     print("cluster count:",maxcluster)
 
-    # Assign each tag to its cluster
-    ftdict = defaultdict(list)
-    for (cluster,frametag) in zip(clusters,frametags):
-        logging.debug("cluster %s path %s",cluster,frametag['path'])
-        frametag['tag'].cluster = cluster
-        ftdict[cluster].append(frametag)
+    # Generate the gallery with a second pipeline, where the key for the gallery comes from the cluster number
+    with SingleThreadedPipeline() as p:
+        p.addLinearPipeline([WriteFramesToHTMLGallery(path='cluster.html')])
+
+        for (cluster,f) in zip(clusters,face_frames):
+            logging.debug("cluster %s frame %s",cluster,f)
+            f.gallery_key = cluster
+            p.process(frame)
 
 
-    MAX_IMAGES_PER_CLUSTER = 5
-    # Generate the HTML page
-    with open("cluster.html","w") as c:
-        c.write(HTML_HEAD)
-        for cl in range(maxcluster+1):
-            logging.debug("ftdict[%s]=%s",cl,ftdict[cl])
-            c.write(f"<h2>Cluster {cl}:</h2>")
-            for (ct,frametag) in enumerate(ftdict[cl]):
-                logging.debug("ct=%s frametag=%s",ct,frametag)
-                if ct<MAX_IMAGES_PER_CLUSTER:
-                    path = frametag['path']
-                    try:
-                        src  = frametag['tag'].src
-                    except AttributeError:
-                        print("no src for:",frametag['tag'])
-                        src  = ""
-                    c.write(f"<a href='{src}'> <img src='{path}' class='Image'/></a>\n  ")
-                elif ct==MAX_IMAGES_PER_CLUSTER:
-                    c.write("...")
-                else:
-                    break
-            c.write("<br/><hr/>")
+    # cluster.html is now made. On a mac just open it
+    subprocess.call(['open','cluster.html'])
     # Done!
 
 

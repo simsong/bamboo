@@ -16,6 +16,7 @@ from filelock import FileLock
 from .frame import Frame,FrameTagDict
 
 DEFAULT_JPG_TEMPLATE="frame{counter:08}.jpg"
+DEFAULT_JSON_TEMPLATE="frame{counter:08}.json"
 
 class Stage(ABC):
     """Abstract base class for processing DAG"""
@@ -53,6 +54,9 @@ class Stage(ABC):
         """
         for s in self.next_stages:
             self.pipeline.queue_output_stage_frame_pair( (s,f) )
+
+    def pipeline_shutdown(self):
+        """Callwed when pipeline is being shut down."""
 
     @property
     def t_mean(self):
@@ -101,10 +105,22 @@ class Multiplex(Stage):
         self.output(f)
 
 
-class WriteFramesToDirectory(Stage):
+class FilterFrames(Stage):
+    def __init__(self, *, framefilter ):
+        """Filter tags according to tagfiler"""
+        super().__init__()
+        self.framefilter = tagfilter
+
+    def process(self, f: Frame):
+        if self.framefilter(f):
+            self.output(f)
+
+
+class SaveFramesToDirectory(Stage):
     def __init__(self, root, *, template=DEFAULT_JPG_TEMPLATE, nonstop=False):
-        """Write the frame to the directory, record the path where written, and move on.
-        If nonstop is True, do not stop for failed writer
+        """Save the images to the directory, record the path where written, and move on.
+        Format is determined by template.
+        :param nonstop: - If True, do not stop for failed writer
         """
         super().__init__()
         self.root     = root
@@ -130,21 +146,85 @@ class WriteFramesToDirectory(Stage):
         # and copy the frame to the output (we are not a sink!)
         self.output(f)
 
-
-class WriteTagsToDirectory(Stage):
-    def __init__(self, *, tagfilter=None, path:str ):
-        """Saves tags that pass tagfilter to the shelf, with locking"""
+class WriteFrameObjectsToDirectory(Stage):
+    def __init__(self, root, *, template=DEFAULT_JSON_TEMPLATE, fmt='json', nonstop=False):
+        """Write the images to the directory, record the path where written, and move on.
+        :param nonstop: - If True, do not stop for failed writer
+        :param fmt:  - Should be 'jpeg' or 'json'
+        """
         super().__init__()
-        self.tagfilter = tagfilter
-        self.path      = path
-        self.lockfile  = path + ".lock"
+        self.root     = root
+        self.counter  = 0
+        self.error_counter = 0
+        self.template = template
+        self.nonstop  = nonstop
+        self.writeImages = writeImages
+        self.writePickles = writePickle
 
-    def process(self, f: Frame):
-        tags = [tag for tag in f.tags if self.tagfilter(tag)] if (self.tagfilter is not None) else f.tags
-        for tag in tags:
-            with open( os.path.join(self.path, str(uuid.uuid4()) + ".tag"), "wb") as fd:
-                pickle.dump( FrameTagDict(f,tag), fd)
+    def process(self, f:Frame):
+        path = os.path.join(self.root, self.template.format(counter=self.counter))
+
+        # Save and increment counter
+        try:
+            self.counter += 1
+            if self.fmt=='json':
+                with open( path , "wb") as fd:
+                    pickle.dump( f.json(), fd)
+            else:
+                raise ValueError("Unknown format: "+self.fmt)
+
+        except FileNotFoundError as e:
+            if self.nonstop:
+                logging.error("Could not write %s %s",f.path,str(e))
+                self.error_counter += 1
+            else:
+                raise
+        # and copy the frame to the output (we are not a sink!)
         self.output(f)
+
+
+class WriteFramesToHTMLGallery(Stage):
+    MAX_IMAGES_PER_CLUSTER = 10
+    HTML_HEAD = "<html><body>\n"
+    HTML_FOOT = "</body></html>\n"
+    def __init__(self, *, path:str, frame_width=5, image_width=72, image_height=72):
+        """Create an HTML file with all of the frames. Each frame must have a tag called GALLERY_KEY."""
+
+        self.path = path
+        self.frame_width = frame_width
+        self.image_width = image_width
+        self.image_height = image_height
+        self.frames_by_key = defaultdict(list)
+
+    def process(self, f):
+        self.frames_by_key[f.gallery_key] = f
+
+    def pipeline_shutdown(self):
+        # Generate the HTML page
+        with open( self.path, "w") as c:
+            c.write(self.HTML_HEAD)
+            for cl in sorted(self.frames_by_key.keys()) :
+                c.write(f"<h2>Cluster {cl}:</h2>")
+                for (ct,f) in enumerate(self.frames_by_key[cl]):
+                    logging.debug("ct=%s f=%s",ct,f)
+                    if ct==MAX_IMAGES_PER_CLUSTER:
+                        c.write("...")
+                        break
+                    if (ct+1) % self.frame_width == 0:
+                        c.write("<br/><hr/>")
+                    path = f.path
+                    try:
+                        src  = frametag['tag'].src
+                        c.write(f"<a href='{src}'>")
+                    except AttributeError:
+                        print("no src for:",frametag['tag'])
+                        src  = None
+                    c.write(f"<img src='{path}' class='Image'/>")
+                    if src is not None:
+                        c.write("</a>")
+                    c.write("\n")
+            c.write(self,HTML_FOOT)
+
 
 def Connect(prev_:Stage, next_:Stage):
     """Make the output of stage prev_ go to next_"""
