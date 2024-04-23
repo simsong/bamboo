@@ -22,6 +22,7 @@ class Pipeline(ABC):
         self.head = None
         self.stages = set()
         self.count  = 0
+        self.running = False
 
     def queue_output_stage_frame_pair(self, pair):
         self.queued_output_stage_frame_pairs.append(pair)
@@ -37,6 +38,8 @@ class Pipeline(ABC):
 
     def process(self, f):
         """Run a frame through the pipeline."""
+        if not self.running:
+            raise RuntimeError("pipeline not running")
         self.count += 1
         self.queue_output_stage_frame_pair( (self.head, f))
         self.run_queue()
@@ -56,12 +59,14 @@ class Pipeline(ABC):
                   file=out)
 
     def __enter__(self):
+        self.running = True
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         for stage in self.stages:
             stage.pipeline_shutdown()
         self.print_stats(out=self.out)
+        self.running = False
         return self
 
 

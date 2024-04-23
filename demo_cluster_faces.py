@@ -20,7 +20,7 @@ from bamboo.pipeline import SingleThreadedPipeline
 from bamboo.stage import SaveFramesToDirectory,ShowTags,Connect,WriteFrameObjectsToDirectory
 from bamboo.face_deepface import DeepFaceTag
 from bamboo.face import ExtractFacesToFrames
-from bamboo.source import DissimilarFrameStream,TagsFromDirectory
+from bamboo.source import DissimilarFrameStream,TagsFromDirectory,FrameStream
 from bamboo.frame import TAG_FACE
 
 
@@ -73,10 +73,10 @@ def cluster_faces(*, rootdir, facedir, tagdir, show):
                 WriteFrameObjectsToDirectory(path=tagdir)
             ])
 
-        if show:
-            Connect(dt, ShowTags(wait=200))
+            if show:
+                Connect(dt, ShowTags(wait=200))
 
-        p.process_list( DissimilarFrameStream( rootdir ) )
+            p.process_list( DissimilarFrameStream( rootdir ) )
 
     # Now gather all of the paths and embeddings in order
     embeddings = []
@@ -139,4 +139,4 @@ if __name__=="__main__":
 
     if args.rootdir and not args.facedir:
         raise RuntimeError("--add requires --facedir")
-    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.dagdir, show=args.show)
+    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.tagdir, show=args.show)
