@@ -45,13 +45,16 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, limit=None):
         with SingleThreadedPipeline() as p:
             p.addLinearPipeline([
                 # For each frame, tag all of the faces:
-                dt:= DeepFaceTagFaces(face_detector='yolov8'),
+                dt:= DeepFaceTagFaces(face_detector='yolov8', embeddings=True),
 
                 # For each tag, create a new frame and send it down the pipeline:
                 ExtractFacesToFrames(scale=1.3),
 
                 # Filter for frames that have a face tag with an embedding
                 FilterFrames(framefilter=frame_has_face_tag_with_embedding),
+
+                # Add the analysis to each frame
+                DeepFaceTagFaces(face_detector='yolov8', embeddings=False, analyze=True),
 
                 # Write the new frames to a directory:
                 SaveFramesToDirectory(root=facedir),

@@ -76,7 +76,7 @@ def any_nan(vect):
 class DeepFaceTagFaces(Stage):
     """
     :param: embedding - also produce embeddings.
-    :param: attributes - also produce attributes.
+    :param: analyze - also produce face analysis.
     :param: model_name - which model to use.
     :param: face_detector - which face detector DeepFace should use.
     :param: normalization - how to normalize faces
@@ -85,7 +85,7 @@ class DeepFaceTagFaces(Stage):
 
     def __init__(self,
                  embeddings=True,
-                 attributes=False,
+                 analyze=False,
                  model_name = 'VGG-Face',
                  face_detector='opencv',
                  normalization='base',
@@ -95,17 +95,20 @@ class DeepFaceTagFaces(Stage):
         assert face_detector in deepface_detector_names()
         assert normalization in deepface_normalization_names()
 
-        if embeddings and attributes:
+        if embeddings and analyze:
             raise ValueError("Currently DeepFaceTagFaces can only generate embeddings or attributes.")
 
         if embeddings:
-            self.engine = deepface.DeepFace.represent
-        elif attributes:
+            def eng(*args,**kwargs):
+                return deepface.DeepFace.represent(*args,model_name=model_name,
+                                                   normalization = self.normalization,
+                                                   **kwargs)
+            self.engine = eng
+        elif analyze:
             self.engine = deepface.DeepFace.analyze
         else:
-            raise ValueError("Please specify embeddings=True or attributes=True")
+            raise ValueError("Please specify embeddings=True or analyze=True")
 
-        self.model_name = model_name
         self.face_detector = face_detector
         self.normalization = normalization
         self.scale       = scale
@@ -116,12 +119,10 @@ class DeepFaceTagFaces(Stage):
         expand_percentage = (self.scale - 1.0) * 100
         try:
             found_faces = self.engine(f.img,
-                                      model_name = self.model_name,
                                       enforce_detection = False,
                                       detector_backend = self.face_detector,
                                       align = True,
-                                      expand_percentage = expand_percentage,
-                                      normalization = self.normalization )
+                                      expand_percentage = expand_percentage)
         except ValueError as e:
                 print(f"{f} DeepFace error {str(e)[0:100]}")
                 return
@@ -132,12 +133,17 @@ class DeepFaceTagFaces(Stage):
             if ('embedding' in found) and any_nan(found['embedding']):
                 del found['embedding']
 
+            kwargs = {}
+            if 'facial_area' in found:
                 facial_area = found['facial_area']
-                f.add_tag(Tag(TAG_FACE,
-                              xy=(facial_area['x'],facial_area['y']),
-                              w=facial_area['w'],
-                              h=facial_area['h'],
-                              **found))
+                kwargs = {'xy':(facial_area['x'],facial_area['y']),
+                          'w':facial_area['w'],
+                          'h':facial_area['h']}
+
+            if self.engine == deepface.DeepFace.analyze:
+                print("found=",found)
+
+            f.add_tag(Tag(TAG_FACE, **{**found,**kwargs} ))
         self.output(f)
 
 
