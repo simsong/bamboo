@@ -35,6 +35,12 @@ TAG_FACE='face'
 TAG_FACE_COUNT='face_count'
 TAG_SKIPPED='skipped'
 
+def json_loads_removing_version(d):
+    nd = json.loads(d)
+    if 'version' in nd:
+        del nd['version']
+    return nd
+
 ## several functions for reading images. All cache.
 ## This allows us to just pass around the path and read the bytes or the cv2 image rapidly from the cache
 
@@ -80,16 +86,17 @@ class Frame:
     If a stage modifies a Frame, it needs to make a copy first."""
     jpeg_quality = DEFAULT_JPEG_QUALITY
     FRAME_VERSION = 1
-    def __init__(self, *, path=None, img=None, src=None, mime_type=None, _w=None, _h=None, _depth=None):
+    def __init__(self, *, path=None, img=None, src=None, mime_type=None, _w=None, _h=None, _depth=None, urn=None,history=None,tags=[]):
         self.version = self.FRAME_VERSION
         self.path = path        # if read or written to a file, the path
-        self.uri  = None        # the full uri; to replace path
-        if src is not None:
+        self.urn  = urn        # the full urn; to replace path
+        if history is not None:
+            self.history = history
+        elif src is not None:
             self.history = copy.copy(src.history)
         else:
-            self.history  = [(P_PATH,path)]          # new history
-        self.tags = []
-        self.tags_added = 0
+            self.history  = [[P_PATH,path]]          # new history
+        self.tags = tags
 
         # These are for overriding the properties
         self._w = _w
@@ -97,7 +104,7 @@ class Frame:
         self._depth = _depth
         self.bytes_ = None
         self.img_   = None
-        self.mime_type_ = mime_type
+        self.mime_type = mime_type
 
         # Set the timestamp
         if path is not None:
@@ -107,6 +114,12 @@ class Frame:
                 self.mtime = datetime.fromtimestamp(os.path.getmtime(path))
         elif img is not None:
             self.mtime = datetime.now()
+
+    def __eq__(self, b):
+        print("a.__dict__=",self.__dict__)
+        print("b.__dict__=",b.__dict__)
+        print("eq=",self.__dict__ == b.__dict__)
+        return self.__dict__ == b.__dict__
 
     def __lt__(self, b):
         return  self.mtime < b.mtime
@@ -118,18 +131,21 @@ class Frame:
         """JSON representation of the frame (without the image)."""
         return json.dumps({'version':self.version,
                            'path':self.path,
-                           'uri':self.uri,
+                           'urn':self.urn,
                            'history':self.history,
-                           'tags':self.tags,
+                           'tags': [tag.dict() for tag in self.tags],
                            '_w':self._w,
                            '_h':self._h,
                            '_depth':self._depth,
-                           'mime_type_':self.mime_type_})
+                           'mime_type':self.mime_type}, default=str)
 
     @classmethod
     def fromJSON(cls, str):
         kwargs = json.loads(str)
-        if kwargs['version']==self.FRAME_VERSION:
+        print("kwargs=",kwargs)
+        if kwargs['version']==cls.FRAME_VERSION:
+            del kwargs['version']
+            kwargs['tags'] = [Tag.fromDict(tagdict) for tagdict in kwargs['tags']]
             return Frame(**kwargs)
         else:
             raise ValueError(f"Cannot load Frame JSON version {kwargs['version']}")
@@ -139,7 +155,7 @@ class Frame:
         """Write the image to a file as a JPEG"""
         logging.debug("save path=%s self=%s",path,self)
         bamboo_save(path, self.jpeg_bytes)
-        self.history.append((P_PATH,path))
+        self.history.append([P_PATH,path])
         self.path = path
 
 
@@ -169,10 +185,8 @@ class Frame:
     def add_tag(self, tag):
         # Before we add the first tag, copy the tags array so that this frame
         # has its own copy of the array
-        if self.tags_added == 0:
-            self.tags = copy.copy(self.tags)
+        self.tags = copy.copy(self.tags)
         self.tags.append(tag)
-        self.tags_added += 1
 
     def show(self, i=None, title=None, wait=0):
         """show the frame, optionally waiting for keyboard"""
@@ -237,33 +251,50 @@ class Frame:
         return img_sim(self.img, i2.img)
 
     def crop(self, *, xy, w, h):
-        """Return a new Frame that is the old one cropped. So copy over the provenance."""
-        cf = CroppedFrame(src=self, xy=xy, w=w, h=h)
-        return cf
-
-class CroppedFrame(Frame):
-    def __init__(self, *, src, xy, w, h):
-        super().__init__(src=src)
-        self._w = w
-        self._h = h
-        # This is weird, but correct.
-        # Slice order is y,x but the point stores x at xy[0].
-        self.img_ = np.copy(src.img[xy[1]:xy[1]+h, xy[0]:xy[0]+w])
-        self.path = None        # no path
-        self.history.append((P_CROP, (xy,(w,h))))
+        """Return a new Frame that is the old one cropped. So copy over the provenance. Tags are not copied."""
+        cropped_img = np.copy( self.img[xy[1]:xy[1]+h, xy[0]:xy[0]+w])
+        history     = copy.copy(self.history)
+        history.append((P_CROP, (xy,(w,h))))
+        return Frame(img = cropped_img,
+                     mime_type = self.mime_type,
+                     history=history)
 
 class Tag:
-    def __init__(self, tag_type, **kwargs):
-        self.text = ""
+    TAG_VERSION = 1
+    def __init__(self, tag_type, text="", **kwargs):
+        self.text = text
         self.tag_type = tag_type
         for (k,v) in kwargs.items():
             setattr(self, k, v)
+
+    def __eq__(self, b):
+        return self.__dict__ == b.__dict__
+
+    @classmethod
+    def fromDict(cls, t):
+        assert t['version']==cls.TAG_VERSION
+        del t['version']
+        return Tag(**t)
+
+    @classmethod
+    def fromJSON(cls, str):
+        return cls.fromDict(json.loads(str))
+
+    @property
+    def json(self):
+        return json.dumps({**{'version':self.TAG_VERSION},
+                             **self.__dict__}, default=str)
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.tag_type} {self.__dict__.keys()}>"
 
     def dict(self):
-        return self.__dict__
+        return {**{'version':self.TAG_VERSION},
+                **self.__dict__}
+
+    def has(self,attr):
+        return hasattr(self,attr)
+
 
 class Patch(Tag):
     """A Patch is a special kind of tag that refers to just a specific area of the Frame"""

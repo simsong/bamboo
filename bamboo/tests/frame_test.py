@@ -15,10 +15,31 @@ from os.path import abspath, dirname, join, basename
 
 sys.path.append(join(dirname(dirname(dirname(__file__)))))
 
-from bamboo.frame import Frame
+from bamboo.frame import Frame,Tag
 
 TEST_DATA_DIR = join(dirname(abspath(__file__)),"data")
 ROBERTS_DATA  = join(TEST_DATA_DIR, "2022_Roberts_Court_Formal_083122_Web.jpg")
+
+def test_json():
+    t = Tag(tag_type='type1',
+            text='text2',
+            hi='mom')
+    print(" t=",t)
+    print("t.json:",t.json)
+
+    assert t.dict() == {'tag_type':'type1', 'text':'text2', 'hi':'mom', 'version':1.0}
+
+    t2 = Tag.fromJSON( t.json )
+    print("t2=",t)
+    assert t==t2
+
+    f = Frame(path=ROBERTS_DATA)
+    f.add_tag(t)
+    print(" f=",f)
+    print(" f.json=",f.json)
+    f2 = Frame.fromJSON( f.json )
+    print("f2=",f2)
+    assert f==f2
 
 def test_frame():
     f = Frame(path=ROBERTS_DATA)

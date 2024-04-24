@@ -65,7 +65,7 @@ def FrameFromFile(path, o:SourceOptions=SourceOptions()):
                 break
             if o.draw():
                 yield frame.Frame(img = img,
-                                  src=pathlib.Path(absolute_path_string).as_uri() + "?frame="+ct)
+                                  src=pathlib.Path(absolute_path_string).as_urn() + "?frame="+ct)
                 if o.atlimit():
                     return
 
@@ -97,9 +97,11 @@ def FrameStream(root, o:SourceOptions=SourceOptions()):
         yield Frame(path=root)
 
 def DissimilarFrameStream(root, o=SourceOptions()):
+    print("root=",root)
     ref = None
     count = 0
     for f in FrameStream(root): # do not pass options
+        print("test",f)
         try:
             st = f.similarity(ref)
         except cv2.error as e: # pylint: disable=catching-non-exception

@@ -109,7 +109,7 @@ class FilterFrames(Stage):
     def __init__(self, *, framefilter ):
         """Filter tags according to tagfiler"""
         super().__init__()
-        self.framefilter = tagfilter
+        self.framefilter = framefilter
 
     def process(self, f: Frame):
         if self.framefilter(f):
@@ -147,10 +147,9 @@ class SaveFramesToDirectory(Stage):
         self.output(f)
 
 class WriteFrameObjectsToDirectory(Stage):
-    def __init__(self, root, *, template=DEFAULT_JSON_TEMPLATE, fmt='json', nonstop=False):
+    def __init__(self, root, *, template=DEFAULT_JSON_TEMPLATE, nonstop=False):
         """Write the images to the directory, record the path where written, and move on.
         :param nonstop: - If True, do not stop for failed writer
-        :param fmt:  - Should be 'jpeg' or 'json'
         """
         super().__init__()
         self.root     = root
@@ -158,8 +157,6 @@ class WriteFrameObjectsToDirectory(Stage):
         self.error_counter = 0
         self.template = template
         self.nonstop  = nonstop
-        self.writeImages = writeImages
-        self.writePickles = writePickle
 
     def process(self, f:Frame):
         path = os.path.join(self.root, self.template.format(counter=self.counter))
@@ -167,11 +164,8 @@ class WriteFrameObjectsToDirectory(Stage):
         # Save and increment counter
         try:
             self.counter += 1
-            if self.fmt=='json':
-                with open( path , "wb") as fd:
-                    pickle.dump( f.json(), fd)
-            else:
-                raise ValueError("Unknown format: "+self.fmt)
+            with open( path , "wb") as fd:
+                fd.write(f.json)
 
         except FileNotFoundError as e:
             if self.nonstop:

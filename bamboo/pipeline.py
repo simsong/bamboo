@@ -28,23 +28,27 @@ class Pipeline(ABC):
         self.queued_output_stage_frame_pairs.append(pair)
 
     def addLinearPipeline(self, stages:list):
+        print("bar")
         self.head = stages[0]
         self.stages.update(stages)   # collect all stages for printing stats
         for i in range(len(stages)-1):
+            print("i=",i)
             stages[i].pipeline = self
             stages[i+1].pipeline = self
             Connect( stages[i], stages[i+1] )
-        return (stages[0],stages[-1])
 
     def process(self, f):
         """Run a frame through the pipeline."""
         if not self.running:
             raise RuntimeError("pipeline not running")
         self.count += 1
+        if self.verbose:
+            print("process",f)
         self.queue_output_stage_frame_pair( (self.head, f))
         self.run_queue()
 
-    def process_list(self, flist):
+    def process_list(self, flist, verbose=False):
+        self.verbose = verbose
         for f in flist:
             self.process(f)
 
@@ -59,15 +63,17 @@ class Pipeline(ABC):
                   file=out)
 
     def __enter__(self):
+        print("__enter__")
         self.running = True
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        print("__exit__")
         for stage in self.stages:
             stage.pipeline_shutdown()
         self.print_stats(out=self.out)
         self.running = False
-        return self
+        return False
 
 
 class SingleThreadedPipeline(Pipeline):
@@ -75,8 +81,10 @@ class SingleThreadedPipeline(Pipeline):
     def __init__(self, out=sys.stdout):
         super().__init__()
         self.out = out
+        print("icky")
 
     def run_queue(self):
+        print("stp - run_queue")
         # Now pass to the next. This logic needs to be moved into the linear pipeline
         # and have the output function store (s,f) pairs.
         while True:

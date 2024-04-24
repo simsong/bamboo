@@ -55,7 +55,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     p = SingleThreadedPipeline()
-    p.addLinearPipeline([ Yolo8FaceDetect(), ShowTags(wait=0), ExtractFaces(scale=1.3), ShowFrames(wait=0) ])
+    p.addLinearPipeline([ Yolo8FaceDetect(),
+                          ShowTags(wait=0),
+                          ExtractFaces(scale=1.3),
+                          ShowFrames(wait=0) ])
     f = Frame(path=args.image)
     p.process(f)
     print(f.tags)

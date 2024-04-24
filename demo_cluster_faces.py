@@ -17,7 +17,7 @@ from lib.ctools import clogging
 from lib.ctools import timer
 
 from bamboo.pipeline import SingleThreadedPipeline
-from bamboo.stage import SaveFramesToDirectory,ShowTags,Connect,WriteFrameObjectsToDirectory
+from bamboo.stage import SaveFramesToDirectory,ShowTags,Connect,WriteFrameObjectsToDirectory,FilterFrames
 from bamboo.face_deepface import DeepFaceTag
 from bamboo.face import ExtractFacesToFrames
 from bamboo.source import DissimilarFrameStream,TagsFromDirectory,FrameStream
@@ -37,23 +37,21 @@ width:128px;
 
 def frame_has_face_tag_with_embedding(f):
     for tag in f.tags:
-        if (tag.type==TAG_FACE) and hasattr(tag,'embedding'):
+        if (tag.tag_type==TAG_FACE) and tag.has('embedding'):
             return True
     return False
 
 
 def cluster_faces(*, rootdir, facedir, tagdir, show):
-
     os.makedirs(tagdir, exist_ok=True)
-
-    def face_tags(t):
-        """A filter for face tags"""
-        return t.tag_type == TAG_FACE
+    os.makedirs(facedir, exist_ok=True)
 
     # If a rootdir was specified, analyze the images and write all of the frames that have
     # and embedding
+    print("rootdir=",rootdir)
     if rootdir:
         with SingleThreadedPipeline() as p:
+            print("yes")
             p.addLinearPipeline([
                 # For each frame, tag all of the faces:
                 dt:= DeepFaceTag(face_detector='yolov8'),
@@ -65,25 +63,29 @@ def cluster_faces(*, rootdir, facedir, tagdir, show):
                 FilterFrames(framefilter=frame_has_face_tag_with_embedding),
 
                 # Write the new frames to a directory:
-                SaveFramesToDirectory(root=facedir, fmt='jpeg'),
+                SaveFramesToDirectory(root=facedir),
 
                 # Write the Frame objects in JSON form
                 # This won't include the frame images themselves, but it includes the saved path
                 # from above, so the images can still be displayed.
-                WriteFrameObjectsToDirectory(path=tagdir)
+                WriteFrameObjectsToDirectory(root=tagdir)
             ])
 
+            print("okay")
             if show:
                 Connect(dt, ShowTags(wait=200))
 
-            p.process_list( DissimilarFrameStream( rootdir ) )
+            print("hi")
+            p.process_list( DissimilarFrameStream( rootdir ), verbose=True )
 
     # Now gather all of the paths and embeddings in order
+    print("xxx")
     embeddings = []
     face_frames = []
     print("Start clustering.")
     with timer.Timer("time to read tags"):
         for f in FrameStream(tagdir):
+            print("cluster f=",f)
             embeddings.append( f.findfirst_tag(TAG_FACE).embedding)
             face_frames.append(f)
 
@@ -91,6 +93,9 @@ def cluster_faces(*, rootdir, facedir, tagdir, show):
     # frametags is a list of all the frametagdicts
 
     logging.debug("number of faces to cluster:%s",len(face_frames))
+    if len(face_frames)==0:
+        print("No faces to cluster")
+        return
 
     # Convert list of embeddings to a numpy array for efficient computation
     X = np.array(embeddings)

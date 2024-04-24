@@ -18,6 +18,6 @@ def test_cluster_faces():
         os.makedirs( facedir := join(td,'facedir'))
         os.makedirs( tagdir  := join(td,'tagdir'))
 
-    demo_cluster_faces.cluster_faces(rootdir = DATA_DIR, facedir=facedir, tagdir=tagdir, dump=True, show=False)
+    demo_cluster_faces.cluster_faces(rootdir = DATA_DIR, facedir=facedir, tagdir=tagdir, show=False)
     print(td)
     call(['find',td,'-ls'])
