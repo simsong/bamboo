@@ -166,6 +166,7 @@ class Frame:
 
     def save(self, urn):
         """Write the image to a file as a JPEG"""
+        print("f=",self)
         logging.debug("save urn=%s self=%s",urn,self)
         bamboo_save(urn, self.jpeg_bytes)
         self.history.append([P_URN,urn])
@@ -266,6 +267,7 @@ class Frame:
 
     def crop(self, *, xy, w, h):
         """Return a new Frame that is the old one cropped. So copy over the provenance. Tags are not copied."""
+        print("xy=",xy,"w=",w,"h=",h)
         cropped_img = np.copy( self.img[xy[1]:xy[1]+h, xy[0]:xy[0]+w])
         history     = copy.copy(self.history)
         history.append([P_CROP, (xy,(w,h))])

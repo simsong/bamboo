@@ -2,9 +2,9 @@
 """
 Find new photos test program.
 Finds them and archives photos significantly different from previous ones with a window.os +/-
+TODO - rewrite with bamboo framework
 
 """
-TODO - rewrite with bamboo framework
 
 
 import os

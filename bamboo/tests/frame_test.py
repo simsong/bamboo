@@ -33,7 +33,7 @@ def test_json():
     print("t2=",t)
     assert t==t2
 
-    f = Frame(path=ROBERTS_DATA)
+    f = Frame(urn=ROBERTS_DATA)
     f.add_tag(t)
     print(" f=",f)
     print(" f.json=",f.json)
@@ -45,7 +45,7 @@ def test_json():
     assert f==f3
 
 def test_frame():
-    f = Frame(path=ROBERTS_DATA)
+    f = Frame(urn=ROBERTS_DATA)
     print("f=",f)
     (h,w,d) = shape = f.shape
     fc = f.crop( xy=(50,75), w=125, h=60)
@@ -53,9 +53,9 @@ def test_frame():
     print("fc._img=",fc._img)
     assert fc.shape == (60, 125, 3)
     assert len(fc.history) == 2
-    assert fc.history[0]==['path',ROBERTS_DATA]
+    assert fc.history[0]==['urn',ROBERTS_DATA]
     assert fc.history[1]==['crop',((50,75), (125,60))]
 
-    assert fc.path is None
+    assert fc.urn is None
     with tempfile.NamedTemporaryFile(suffix='.jpg') as tf:
         fc.save(tf.name)

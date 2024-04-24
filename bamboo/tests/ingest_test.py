@@ -31,5 +31,5 @@ def test_filename_template():
     with tempfile.NamedTemporaryFile() as tf:
         REFERENCE_TIME = 1711983244.622765
         os.utime(tf.name, (int(REFERENCE_TIME), int(REFERENCE_TIME)))
-        name = ingest.filename_template(camera="cam1", path=tf.name)
+        name = ingest.filename_template(camera="cam1", urn=tf.name)
         assert name == "cam1/2024-04/20240401-105404"
