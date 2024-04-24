@@ -6,6 +6,7 @@ A simple pipeline to extract all of the faces from a set of photos, write them t
 import os
 import math
 import logging
+import subprocess
 
 from collections import defaultdict
 
@@ -17,23 +18,12 @@ from lib.ctools import clogging
 from lib.ctools import timer
 
 from bamboo.pipeline import SingleThreadedPipeline
-from bamboo.stage import SaveFramesToDirectory,ShowTags,Connect,WriteFrameObjectsToDirectory,FilterFrames
+from bamboo.stage import SaveFramesToDirectory,ShowTags,Connect,WriteFrameObjectsToDirectory,FilterFrames,WriteFramesToHTMLGallery
 from bamboo.face_deepface import DeepFaceTag
 from bamboo.face import ExtractFacesToFrames
-from bamboo.source import DissimilarFrameStream,TagsFromDirectory,FrameStream
+from bamboo.source import DissimilarFrameStream,TagsFromDirectory,FrameStream,SourceOptions
 from bamboo.frame import TAG_FACE
 
-
-HTML_HEAD = """
-<html>
-<style>
-img.Image {
-max-width:128px;
-width:128px;
-}
-</style>
-<body>
-"""
 
 def frame_has_face_tag_with_embedding(f):
     for tag in f.tags:
@@ -42,16 +32,17 @@ def frame_has_face_tag_with_embedding(f):
     return False
 
 
-def cluster_faces(*, rootdir, facedir, tagdir, show):
+def cluster_faces(*, rootdir, facedir, tagdir, show, limit=None):
     os.makedirs(tagdir, exist_ok=True)
     os.makedirs(facedir, exist_ok=True)
 
+    so = SourceOptions(limit=limit)
+    print("cf. so.limit=",so.limit)
+
     # If a rootdir was specified, analyze the images and write all of the frames that have
     # and embedding
-    print("rootdir=",rootdir)
     if rootdir:
         with SingleThreadedPipeline() as p:
-            print("yes")
             p.addLinearPipeline([
                 # For each frame, tag all of the faces:
                 dt:= DeepFaceTag(face_detector='yolov8'),
@@ -71,20 +62,18 @@ def cluster_faces(*, rootdir, facedir, tagdir, show):
                 WriteFrameObjectsToDirectory(root=tagdir)
             ])
 
-            print("okay")
             if show:
                 Connect(dt, ShowTags(wait=200))
 
-            print("hi")
-            p.process_list( DissimilarFrameStream( rootdir ), verbose=True )
+            print("2. so.limit=",so.limit)
+            p.process_list( DissimilarFrameStream( rootdir, o=so ), verbose=True )
 
     # Now gather all of the paths and embeddings in order
-    print("xxx")
     embeddings = []
     face_frames = []
     print("Start clustering.")
     with timer.Timer("time to read tags"):
-        for f in FrameStream(tagdir):
+        for f in FrameStream(tagdir,verbose=True):
             print("cluster f=",f)
             embeddings.append( f.findfirst_tag(TAG_FACE).embedding)
             face_frames.append(f)
@@ -120,12 +109,10 @@ def cluster_faces(*, rootdir, facedir, tagdir, show):
         for (cluster,f) in zip(clusters,face_frames):
             logging.debug("cluster %s frame %s",cluster,f)
             f.gallery_key = cluster
-            p.process(frame)
+            p.process(f)
 
 
     # cluster.html is now made. On a mac just open it
-    subprocess.call(['open','cluster.html'])
-    # Done!
 
 
 if __name__=="__main__":
@@ -138,10 +125,12 @@ if __name__=="__main__":
     parser.add_argument("--tagdir", help="Where to write tags", required=True)
     parser.add_argument("--dump",help="dump the database before clustering",action='store_true')
     parser.add_argument("--show", help="Show faces as they are ingested", action='store_true')
+    parser.add_argument("--limit", type=int)
     clogging.add_argument(parser, loglevel_default='WARNING')
     args = parser.parse_args()
     clogging.setup(level=args.loglevel)
 
     if args.rootdir and not args.facedir:
         raise RuntimeError("--add requires --facedir")
-    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.tagdir, show=args.show)
+    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.tagdir, show=args.show, limit=args.limit)
+    subprocess.call(['open','cluster.html'])

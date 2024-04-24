@@ -12,27 +12,27 @@ import atexit
 import logging
 
 from .frame import Frame
-from .stage import Connect
+from .stage import Connect,validate_stage
 
 
 class Pipeline(ABC):
     """Base pipeline class"""
-    def __init__(self):
+    def __init__(self, verbose=False):
         self.queued_output_stage_frame_pairs = collections.deque()
         self.head = None
         self.stages = set()
         self.count  = 0
         self.running = False
+        self.verbose = verbose
 
     def queue_output_stage_frame_pair(self, pair):
         self.queued_output_stage_frame_pairs.append(pair)
 
     def addLinearPipeline(self, stages:list):
-        print("bar")
+        [validate_stage(stage) for stage in stages]
         self.head = stages[0]
         self.stages.update(stages)   # collect all stages for printing stats
         for i in range(len(stages)-1):
-            print("i=",i)
             stages[i].pipeline = self
             stages[i+1].pipeline = self
             Connect( stages[i], stages[i+1] )
@@ -63,12 +63,10 @@ class Pipeline(ABC):
                   file=out)
 
     def __enter__(self):
-        print("__enter__")
         self.running = True
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        print("__exit__")
         for stage in self.stages:
             stage.pipeline_shutdown()
         self.print_stats(out=self.out)
@@ -78,13 +76,11 @@ class Pipeline(ABC):
 
 class SingleThreadedPipeline(Pipeline):
     """Runs the pipeline in the caller's thread. Print stats on exit"""
-    def __init__(self, out=sys.stdout):
-        super().__init__()
+    def __init__(self, out=sys.stdout, **kwargs):
+        super().__init__(**kwargs)
         self.out = out
-        print("icky")
 
     def run_queue(self):
-        print("stp - run_queue")
         # Now pass to the next. This logic needs to be moved into the linear pipeline
         # and have the output function store (s,f) pairs.
         while True:

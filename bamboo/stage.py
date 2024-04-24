@@ -10,6 +10,8 @@ import collections
 import uuid
 import shelve
 import pickle
+import logging
+from collections import defaultdict
 from abc import ABC,abstractmethod
 from filelock import FileLock
 
@@ -17,6 +19,10 @@ from .frame import Frame,FrameTagDict
 
 DEFAULT_JPG_TEMPLATE="frame{counter:08}.jpg"
 DEFAULT_JSON_TEMPLATE="frame{counter:08}.json"
+
+def validate_stage(stage):
+    if not hasattr(stage,'count'):
+        raise RuntimeError(str(stage) + "did not call super().__init__()")
 
 class Stage(ABC):
     """Abstract base class for processing DAG"""
@@ -164,7 +170,7 @@ class WriteFrameObjectsToDirectory(Stage):
         # Save and increment counter
         try:
             self.counter += 1
-            with open( path , "wb") as fd:
+            with open( path , "w") as fd:
                 fd.write(f.json)
 
         except FileNotFoundError as e:
@@ -179,51 +185,49 @@ class WriteFrameObjectsToDirectory(Stage):
 
 class WriteFramesToHTMLGallery(Stage):
     MAX_IMAGES_PER_CLUSTER = 10
-    HTML_HEAD = "<html><body>\n"
+    HTML_HEAD = """
+<html>
+<style>
+img.Image {
+max-width:128px;
+width:128px;
+}
+</style>
+<body>
+    """
     HTML_FOOT = "</body></html>\n"
-    def __init__(self, *, path:str, frame_width=5, image_width=72, image_height=72):
+    def __init__(self, *, path:str, images_per_row=10, image_width=72, image_height=72):
         """Create an HTML file with all of the frames. Each frame must have a tag called GALLERY_KEY."""
-
+        super().__init__()
         self.path = path
-        self.frame_width = frame_width
+        self.images_per_row = images_per_row
         self.image_width = image_width
         self.image_height = image_height
         self.frames_by_key = defaultdict(list)
 
     def process(self, f):
-        self.frames_by_key[f.gallery_key] = f
+        self.frames_by_key[f.gallery_key].append(f)
 
     def pipeline_shutdown(self):
         # Generate the HTML page
         with open( self.path, "w") as c:
             c.write(self.HTML_HEAD)
-            for cl in sorted(self.frames_by_key.keys()) :
-                c.write(f"<h2>Cluster {cl}:</h2>")
-                for (ct,f) in enumerate(self.frames_by_key[cl]):
+            for (cl,frames) in sorted(self.frames_by_key.items()) :
+                c.write(f"<h2>Cluster {cl}:</h2><p><i>{len(frames)} images</i></p>\n")
+                for (ct,f) in enumerate(frames):
                     logging.debug("ct=%s f=%s",ct,f)
-                    if ct==MAX_IMAGES_PER_CLUSTER:
+                    if ct==self.MAX_IMAGES_PER_CLUSTER:
                         c.write("...")
                         break
-                    if (ct+1) % self.frame_width == 0:
-                        c.write("<br/><hr/>")
-                    path = f.path
-                    try:
-                        src  = frametag['tag'].src
-                        c.write(f"<a href='{src}'>")
-                    except AttributeError:
-                        print("no src for:",frametag['tag'])
-                        src  = None
-                    c.write(f"<img src='{path}' class='Image'/>")
-                    if src is not None:
-                        c.write("</a>")
+                    if (ct+1) % self.images_per_row == 0:
+                        c.write("<br/>")
+                    c.write(f"<img src='{f.urn}' class='Image'/>")
                     c.write("\n")
-            c.write(self,HTML_FOOT)
+            c.write(self.HTML_FOOT)
 
 
 def Connect(prev_:Stage, next_:Stage):
     """Make the output of stage prev_ go to next_"""
-    if not hasattr(prev_,'count'):
-        raise RuntimeError(str(prev) + "did not call super().__init__()")
-    if not hasattr(next_,'count'):
-        raise RuntimeError(str(next_) + "did not call super().__init__()")
+    validate_stage(prev_)
+    validate_stage(next_)
     prev_.next_stages.add(next_)

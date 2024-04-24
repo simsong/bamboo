@@ -40,16 +40,23 @@ class SourceOptions:
         self.frameHeight = None
         self.counter = 0
         for (k,v) in kwargs.items():
+            print("set",k,v)
             setattr(self,k,v)
+        print("self.limit=",self.limit)
 
     def draw(self):
         """Return True if we should sample."""
+        print("self.limit=",self.limit)
         return self.sampling >= random.random()
 
     def atlimit(self):
         """Increment counter and return True if we are at the limit."""
         self.counter += 1
-        return (self.limit is not None) and (self.counter >= self.limit)
+        if self.limit is None:
+            return False
+        elif self.counter >= self.limit:
+            return True
+        return False
 
 
 def FrameFromFile(path, o:SourceOptions=SourceOptions()):
@@ -69,48 +76,51 @@ def FrameFromFile(path, o:SourceOptions=SourceOptions()):
                 if o.atlimit():
                     return
 
-
-def FrameStream(root, o:SourceOptions=SourceOptions()):
+def FrameStream(root, o:SourceOptions=SourceOptions(), verbose=False):
     """Generator for a series of Frame() objects from a disk file.
     Returns frames in sort order within each directory"""
     if os.path.isdir(root):
         for (dirpath, dirnames, filenames) in os.walk(root): # pylint: disable=unused-variable
             dirnames.sort()                                  # makes the directories recurse in sort order
             for fname in sorted(filenames):
+                path = os.path.join(dirpath, fname)
                 mtype = mimetypes.guess_type(fname)[0]
                 if mtype is None:
                     continue
                 if mtype.split("/")[0] in ['video','image']:
                     if o.draw():
-                        path = os.path.join(dirpath, fname)
                         if os.path.getsize(path)>0:
                             try:
-                                f = Frame(path=path, mime_type=mtype)
+                                f = Frame(urn=path, mime_type=mtype)
                             except FileNotFoundError as e:
                                 print(f"Cannot read '{path}': {e}",file=sys.stderr)
                                 continue
                             yield f
                             if o.atlimit():
                                 return
+                if mtype=='application/json':
+                    if o.draw():
+                        with open(path,"r") as fd:
+                            yield Frame.fromJSON(fd.read())
+                        if o.atlimit():
+                            return
 
     else:
-        yield Frame(path=root)
+        yield Frame(urn=root)
 
 def DissimilarFrameStream(root, o=SourceOptions()):
-    print("root=",root)
+    print("dfs. o.limit=",o.limit)
     ref = None
     count = 0
-    for f in FrameStream(root): # do not pass options
-        print("test",f)
+    for f in FrameStream(root, o=o): # do not pass options
         try:
             st = f.similarity(ref)
         except cv2.error as e: # pylint: disable=catching-non-exception
-            print(f"Error: {e} with {f.path}",file=sys.stderr)
+            print(f"Error: {e} with {f.urn}",file=sys.stderr)
             continue
         except FileNotFoundError as e:
-            print(f"Cannot read '{f.path}': {e}",file=sys.stderr)
+            print(f"Cannot read '{f.urn}': {e}",file=sys.stderr)
             continue
-        print("st=",st,"o.score=",o.score)
         if st < o.score:
             if o.draw():
                 yield f

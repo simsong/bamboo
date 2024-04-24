@@ -59,6 +59,6 @@ if __name__ == '__main__':
                           ShowTags(wait=0),
                           ExtractFaces(scale=1.3),
                           ShowFrames(wait=0) ])
-    f = Frame(path=args.image)
+    f = Frame(urn=args.image)
     p.process(f)
     print(f.tags)

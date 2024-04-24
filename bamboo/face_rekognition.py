@@ -48,7 +48,6 @@ class RekognitionFaceDetect(Stage):
             session = boto3.Session(profile_name=self.profile_name, region_name=self.region_name)
             client = session.client('rekognition', region_name=self.region_name)
             bytes = f.bytes
-            print("BYTES len()=",len(bytes))
             response = client.detect_faces(Image={'Bytes':f.bytes}, Attributes=['ALL'])
             faceDetails = response['FaceDetails']
             save_info(f, faceDetails)

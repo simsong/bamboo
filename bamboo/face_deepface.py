@@ -96,13 +96,18 @@ class DeepFaceTag(Stage):
         f = f.copy()            # we will be adding tags
         expand_percentage = (self.scale - 1.0) * 100
         if self.embeddings or self.attributes:
-            for found in deepface.DeepFace.represent(f.img,
-                                                     model_name = self.model_name,
-                                                     enforce_detection = False,
-                                                     detector_backend = self.face_detector,
-                                                     align = True,
-                                                     expand_percentage = expand_percentage,
-                                                     normalization = self.normalization ):
+            try:
+                res = deepface.DeepFace.represent(f.img,
+                                                  model_name = self.model_name,
+                                                  enforce_detection = False,
+                                                  detector_backend = self.face_detector,
+                                                  align = True,
+                                                  expand_percentage = expand_percentage,
+                                                  normalization = self.normalization )
+            except ValueError as e:
+                print(f"{f} DeepFace error {str(e)[0:100]}")
+                return
+            for found in res:
 
                 # deepface sometimes creates embeddings with nan's.
                 # If we find them, remove them
