@@ -19,7 +19,7 @@ from lib.ctools import timer
 
 from bamboo.pipeline import SingleThreadedPipeline
 from bamboo.stage import SaveFramesToDirectory,ShowTags,Connect,WriteFrameObjectsToDirectory,FilterFrames,WriteFramesToHTMLGallery
-from bamboo.face_deepface import DeepFaceTag
+from bamboo.face_deepface import DeepFaceTagFaces
 from bamboo.face import ExtractFacesToFrames
 from bamboo.source import DissimilarFrameStream,TagsFromDirectory,FrameStream,SourceOptions
 from bamboo.frame import TAG_FACE
@@ -45,7 +45,7 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, limit=None):
         with SingleThreadedPipeline() as p:
             p.addLinearPipeline([
                 # For each frame, tag all of the faces:
-                dt:= DeepFaceTag(face_detector='yolov8'),
+                dt:= DeepFaceTagFaces(face_detector='yolov8'),
 
                 # For each tag, create a new frame and send it down the pipeline:
                 ExtractFacesToFrames(scale=1.3),

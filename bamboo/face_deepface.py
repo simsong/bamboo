@@ -73,8 +73,19 @@ def any_nan(vect):
             return True
     return False
 
-class DeepFaceTag(Stage):
-    def __init__(self, embeddings=True, attributes=True,
+class DeepFaceTagFaces(Stage):
+    """
+    :param: embedding - also produce embeddings.
+    :param: attributes - also produce attributes.
+    :param: model_name - which model to use.
+    :param: face_detector - which face detector DeepFace should use.
+    :param: normalization - how to normalize faces
+    :param: scale - enlarge boxes around faces.
+    """
+
+    def __init__(self,
+                 embeddings=True,
+                 attributes=False,
                  model_name = 'VGG-Face',
                  face_detector='opencv',
                  normalization='base',
@@ -84,8 +95,16 @@ class DeepFaceTag(Stage):
         assert face_detector in deepface_detector_names()
         assert normalization in deepface_normalization_names()
 
-        self.embeddings = embeddings
-        self.attributes = attributes
+        if embeddings and attributes:
+            raise ValueError("Currently DeepFaceTagFaces can only generate embeddings or attributes.")
+
+        if embeddings:
+            self.engine = deepface.DeepFace.represent
+        elif attributes:
+            self.engine = deepface.DeepFace.analyze
+        else:
+            raise ValueError("Please specify embeddings=True or attributes=True")
+
         self.model_name = model_name
         self.face_detector = face_detector
         self.normalization = normalization
@@ -95,24 +114,23 @@ class DeepFaceTag(Stage):
         # Detect Objects
         f = f.copy()            # we will be adding tags
         expand_percentage = (self.scale - 1.0) * 100
-        if self.embeddings or self.attributes:
-            try:
-                res = deepface.DeepFace.represent(f.img,
-                                                  model_name = self.model_name,
-                                                  enforce_detection = False,
-                                                  detector_backend = self.face_detector,
-                                                  align = True,
-                                                  expand_percentage = expand_percentage,
-                                                  normalization = self.normalization )
-            except ValueError as e:
+        try:
+            found_faces = self.engine(f.img,
+                                      model_name = self.model_name,
+                                      enforce_detection = False,
+                                      detector_backend = self.face_detector,
+                                      align = True,
+                                      expand_percentage = expand_percentage,
+                                      normalization = self.normalization )
+        except ValueError as e:
                 print(f"{f} DeepFace error {str(e)[0:100]}")
                 return
-            for found in res:
 
-                # deepface sometimes creates embeddings with nan's.
-                # If we find them, remove them
-                if ('embedding' in found) and any_nan(found['embedding']):
-                    del found['embedding']
+        for found in found_faces:
+            # deepface sometimes creates embeddings with nan's.
+            # If we find them, remove them
+            if ('embedding' in found) and any_nan(found['embedding']):
+                del found['embedding']
 
                 facial_area = found['facial_area']
                 f.add_tag(Tag(TAG_FACE,
@@ -129,7 +147,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     p = SingleThreadedPipeline()
-    p.addLinearPipeline([ DeepFaceTag(detector_backend='yolov8'),
+    p.addLinearPipeline([ DeepFaceTagFaces(detector_backend='yolov8'),
                           ShowTags(wait=0),
                           ExtractFacesToFrames(scale=1.3),
                           ShowFrames(wait=0) ])
