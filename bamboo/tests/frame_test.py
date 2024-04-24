@@ -41,9 +41,13 @@ def test_json():
     print("f2=",f2)
     assert f==f2
 
+    f3 = f.copy()
+    assert f==f3
+
 def test_frame():
     f = Frame(path=ROBERTS_DATA)
     fc = f.crop( xy=(50,75), w=125, h=60)
+    print("fc.w=",fc.w)
     assert fc.w == 125
     assert fc.h == 60
     assert len(fc.history) == 2
