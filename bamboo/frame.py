@@ -47,6 +47,7 @@ def json_loads_removing_version(d):
 @functools.lru_cache(maxsize=MAXSIZE_CACHE)
 def bytes_read(path):
     """Returns the file, which is compressed as a JPEG"""
+    assert path is not None
     with open(path,"rb") as f:
         return f.read()
 
@@ -59,6 +60,7 @@ def hash_read(path):
 @functools.lru_cache(maxsize=MAXSIZE_CACHE)
 def image_read(path):
     """Caching image read. We cache to minimize what's stored in memory. We make it immutable to allow sharing"""
+    assert path is not None
     img = cv2.imdecode(np.frombuffer( bytes_read(path), np.uint8), cv2.IMREAD_ANYCOLOR)
     if img is None:
         raise FileNotFoundError("cannot read:"+path)
@@ -103,7 +105,7 @@ class Frame:
         self._h = _h
         self._depth = _depth
         self.bytes_ = None
-        self.img_   = None
+        self._img   = img
         self.mime_type = mime_type
 
         # Set the timestamp
@@ -168,8 +170,8 @@ class Frame:
     def writable_copy(self):
         """Returns a copy into which we can write"""
         c = self.copy()
-        c.img_ = self.img.copy()
-        c.img_.flags.writable=True
+        c._img = self.img.copy()
+        c._img.flags.writable=True
         c.path_ = None
         return c
 
@@ -212,7 +214,7 @@ class Frame:
     @property
     def img(self):
         """return an opencv image object that is not writable."""
-        return self.img_ if self.img_ is not None else image_read(self.path)
+        return self._img if self._img is not None else image_read(self.path)
 
     @property
     def img_grayscale(self):
@@ -225,23 +227,14 @@ class Frame:
         logging.debug("self=%s",self)
         if self.path is not None:
             return bytes_read(self.path)
-        return cv2.imencode('.jpg', self.img_, [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality])[1]
+        return cv2.imencode('.jpg', self._img, [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality])[1]
 
     @property
-    @functools.lru_cache(maxsize=3)
-    def w(self):
-        return self._w if self._w is not None else self.img.shape[1]
-
-    @property
-    @functools.lru_cache(maxsize=3)
-    def h(self):
-        """height (y) is the first index in the shape. nparray goes from lsb to msb"""
-        return self._h  if self._h  is not None else self.img.shape[0]
-
-    @property
-    @functools.lru_cache(maxsize=3)
-    def depth(self):
-        return self._depth if self._depth is not None else self.img.shape[2]
+    def shape(self):
+        """Returns shape. note: shape[0] = height, shape[1]=width, shape[2]==depth"""
+        if self._w is not None and self._h is not None and self._depth is not Nonde:
+            return (self._h, self._w, self._depth)
+        return tuple(self.img.shape)
 
     @functools.lru_cache(maxsize=10)
     def similarity(self, i2):
@@ -254,7 +247,7 @@ class Frame:
         """Return a new Frame that is the old one cropped. So copy over the provenance. Tags are not copied."""
         cropped_img = np.copy( self.img[xy[1]:xy[1]+h, xy[0]:xy[0]+w])
         history     = copy.copy(self.history)
-        history.append((P_CROP, (xy,(w,h))))
+        history.append([P_CROP, (xy,(w,h))])
         return Frame(img = cropped_img,
                      mime_type = self.mime_type,
                      history=history)

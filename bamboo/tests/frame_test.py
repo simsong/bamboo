@@ -46,13 +46,15 @@ def test_json():
 
 def test_frame():
     f = Frame(path=ROBERTS_DATA)
+    print("f=",f)
+    (h,w,d) = shape = f.shape
     fc = f.crop( xy=(50,75), w=125, h=60)
-    print("fc.w=",fc.w)
-    assert fc.w == 125
-    assert fc.h == 60
+    print("fc=",fc)
+    print("fc._img=",fc._img)
+    assert fc.shape == (60, 125, 3)
     assert len(fc.history) == 2
-    assert fc.history[0]==('path',ROBERTS_DATA)
-    assert fc.history[1]==('crop',((50,75), (125,60)))
+    assert fc.history[0]==['path',ROBERTS_DATA]
+    assert fc.history[1]==['crop',((50,75), (125,60))]
 
     assert fc.path is None
     with tempfile.NamedTemporaryFile(suffix='.jpg') as tf:
