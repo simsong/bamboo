@@ -183,6 +183,7 @@ class WriteFrameObjectsToDirectory(Stage):
         self.output(f)
 
 
+WriteFramesToHTMLGallery_tag="bamboo.stage.WriteFramesToHTMLGallery.tag"
 class WriteFramesToHTMLGallery(Stage):
     MAX_IMAGES_PER_CLUSTER = 10
     HTML_HEAD = """
@@ -192,15 +193,24 @@ img.Image {
 max-width:128px;
 width:128px;
 }
+div.images {
+ display:flex;
+}
 </style>
 <body>
     """
     HTML_FOOT = "</body></html>\n"
-    def __init__(self, *, path:str, images_per_row=10, image_width=72, image_height=72):
+    CLUSTER_START_HTML="\n<div class='cluster'>"
+    CLUSTER_TITLE_HTML = "<h2>Cluster {cluster_number}:</h2><p><i>{frames_in_cluster} images</i></p>"
+    IMAGES_START_HTML = "<div class='images'>"
+    IMAGES_END_HTML = "</div>\n"
+    IMAGES_MORE_HTML="..."
+    CLUSTER_END_HTML = "</div>\n"
+    IMAGE_HTML = "<div class='face'><img src='{urn}' class='Image'/><div class='caption'>{caption}</div></div>"
+    def __init__(self, *, path:str, image_width=72, image_height=72):
         """Create an HTML file with all of the frames. Each frame must have a tag called GALLERY_KEY."""
         super().__init__()
         self.path = path
-        self.images_per_row = images_per_row
         self.image_width = image_width
         self.image_height = image_height
         self.frames_by_key = defaultdict(list)
@@ -209,22 +219,30 @@ width:128px;
         self.frames_by_key[f.gallery_key].append(f)
 
     def pipeline_shutdown(self):
-        # Generate the HTML page
+        self.generate_html_gallery()
+
+    def generate_html_gallery(self):
         with open( self.path, "w") as c:
             c.write(self.HTML_HEAD)
-            for (cl,frames) in sorted(self.frames_by_key.items()) :
-                c.write(f"<h2>Cluster {cl}:</h2><p><i>{len(frames)} images</i></p>\n")
+            for (cluster_number,frames) in sorted(self.frames_by_key.items()) :
+                c.write(self.CLUSTER_START_HTML)
+                c.write(self.CLUSTER_TITLE_HTML.format(cluster_number=cluster_number,
+                                                  frames_in_cluster=len(frames)))
+                c.write(self.IMAGES_START_HTML)
                 for (ct,f) in enumerate(frames):
-                    logging.debug("ct=%s f=%s",ct,f)
                     if ct==self.MAX_IMAGES_PER_CLUSTER:
-                        c.write("...")
+                        c.write( self.IMAGES_MORE_HTML)
                         break
-                    if (ct+1) % self.images_per_row == 0:
-                        c.write("<br/>")
-                    c.write(f"<img src='{f.urn}' class='Image'/>")
-                    c.write("\n")
+                    t = f.findfirst_tag(WriteFramesToHTMLGallery_tag)
+                    if t:
+                        caption = t.caption
+                        print("caption:",caption)
+                    else:
+                        caption = ''
+                    c.write( self.IMAGE_HTML.format(urn=f.urn, caption=caption))
+                c.write(self.IMAGES_END_HTML)
+                c.write(self.CLUSTER_END_HTML)
             c.write(self.HTML_FOOT)
-
 
 def Connect(prev_:Stage, next_:Stage):
     """Make the output of stage prev_ go to next_"""

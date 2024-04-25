@@ -228,7 +228,7 @@ class Frame:
 
     def findfirst_tag(self, tag_type):
         for tag in self.tags:
-            if tag.tag_type==TAG_FACE:
+            if tag.tag_type==tag_type:
                 return tag
         return None
 
@@ -285,6 +285,12 @@ class Tag:
 
     def __eq__(self, b):
         return self.__dict__ == b.__dict__
+
+    def __getitem__(self, key):
+        return self.__dict__.__getitem__(key)
+
+    def __setitem__(self, k, v):
+        return self.__dict__.__setitem__(k, v)
 
     @classmethod
     def fromDict(cls, t):

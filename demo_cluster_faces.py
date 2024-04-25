@@ -18,11 +18,11 @@ from lib.ctools import clogging
 from lib.ctools import timer
 
 from bamboo.pipeline import SingleThreadedPipeline
-from bamboo.stage import SaveFramesToDirectory,ShowTags,Connect,WriteFrameObjectsToDirectory,FilterFrames,WriteFramesToHTMLGallery
+from bamboo.stage import Stage,SaveFramesToDirectory,ShowTags,Connect,WriteFrameObjectsToDirectory,FilterFrames,WriteFramesToHTMLGallery,WriteFramesToHTMLGallery_tag
 from bamboo.face_deepface import DeepFaceTagFaces
 from bamboo.face import ExtractFacesToFrames
 from bamboo.source import DissimilarFrameStream,TagsFromDirectory,FrameStream,SourceOptions
-from bamboo.frame import TAG_FACE
+from bamboo.frame import Frame,Tag,TAG_FACE
 
 
 def frame_has_face_tag_with_embedding(f):
@@ -31,6 +31,27 @@ def frame_has_face_tag_with_embedding(f):
             return True
     return False
 
+
+def caption_from_tag(tag):
+    caption = ''
+    try:
+        caption += f'age: {tag["age"]}<br/>'
+    except KeyError:
+        pass
+    for k,v in tag.dict().items():
+        if k.startswith("dominant_"):
+            caption += f'{k[9:]}: {v}<br/>'
+    return caption
+
+class CaptionFaces(Stage):
+    def process(self, f:Frame):
+        caption = ''
+        for tag in f.findall_tags(TAG_FACE):
+            caption += caption_from_tag(tag)
+
+        if caption:
+            f.add_tag( Tag(WriteFramesToHTMLGallery_tag, caption=caption))
+        super().process(f)      # and continue processing
 
 def cluster_faces(*, rootdir, facedir, tagdir, show, limit=None):
     os.makedirs(tagdir, exist_ok=True)
@@ -56,6 +77,9 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, limit=None):
                 # Add the analysis to each frame
                 DeepFaceTagFaces(face_detector='yolov8', embeddings=False, analyze=True),
 
+                # Generate captions for each tagged face (this is declared above)
+                CaptionFaces(),
+
                 # Write the new frames to a directory:
                 SaveFramesToDirectory(root=facedir),
 
@@ -68,7 +92,6 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, limit=None):
             if show:
                 Connect(dt, ShowTags(wait=200))
 
-            print("2. so.limit=",so.limit)
             p.process_list( DissimilarFrameStream( rootdir, o=so ), verbose=True )
 
     # Now gather all of the paths and embeddings in order
