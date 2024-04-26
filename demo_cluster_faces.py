@@ -17,20 +17,18 @@ import numpy as np
 from lib.ctools import clogging
 from lib.ctools import timer
 
-from bamboo.pipeline import SingleThreadedPipeline
-from bamboo.stage import Stage,SaveFramesToDirectory,ShowTags,Connect,WriteFrameObjectsToDirectory,FilterFrames,WriteFramesToHTMLGallery,WriteFramesToHTMLGallery_tag
+from bamboo.stage  import Stage,SaveFramesToDirectory,ShowTags,Connect,WriteFrameObjectsToDirectory,FilterFrames,WriteFramesToHTMLGallery,WriteFramesToHTMLGallery_tag
 from bamboo.face_deepface import DeepFaceTagFaces
-from bamboo.face import ExtractFacesToFrames
+from bamboo.face   import ExtractFacesToFrames
 from bamboo.source import DissimilarFrameStream,TagsFromDirectory,FrameStream,SourceOptions
-from bamboo.frame import Frame,Tag,TAG_FACE
-
+from bamboo.frame  import Frame,Tag,TAG_FACE
+from bamboo.pipeline import SingleThreadedPipeline
 
 def frame_has_face_tag_with_embedding(f):
     for tag in f.tags:
         if (tag.tag_type==TAG_FACE) and tag.has('embedding'):
             return True
     return False
-
 
 def caption_from_tag(tag):
     caption = ''
@@ -60,6 +58,12 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, limit=None):
     so = SourceOptions(limit=limit)
     print("cf. so.limit=",so.limit)
 
+    # Get all the tags and build a list of urns. We won't scan them a second time.
+    seen_urns = set()
+    for f in FrameStream(tagdir,verbose=True):
+        seen_urns.add(f.src_urn)
+    print(f"{len(seen_urns)} in {tagdir}")
+
     # If a rootdir was specified, analyze the images and write all of the frames that have
     # and embedding
     if rootdir:
@@ -72,7 +76,7 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, limit=None):
                 ExtractFacesToFrames(scale=1.3),
 
                 # Filter for frames that have a face tag with an embedding
-                FilterFrames(framefilter=frame_has_face_tag_with_embedding),
+                FilterFrames(input_filter=frame_has_face_tag_with_embedding),
 
                 # Add the analysis to each frame
                 DeepFaceTagFaces(face_detector='yolov8', embeddings=False, analyze=True),
@@ -92,27 +96,30 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, limit=None):
             if show:
                 Connect(dt, ShowTags(wait=200))
 
-            p.process_list( DissimilarFrameStream( rootdir, o=so ), verbose=True )
+            def not_seen(f):
+                if f.urn in seen_urns:
+                    return False
+                return True
+
+            p.process_list( DissimilarFrameStream( rootdir, o=so, output_filter=not_seen ),
+                            verbose=True )
 
     # Now gather all of the paths and embeddings in order
     embeddings = []
     face_frames = []
-    print("Start clustering.")
-    with timer.Timer("time to read tags"):
-        for f in FrameStream(tagdir,verbose=True):
-            print("cluster f=",f)
-            embeddings.append( f.findfirst_tag(TAG_FACE).embedding)
-            face_frames.append(f)
+    for f in FrameStream(tagdir,verbose=True):
+        embeddings.append( f.findfirst_tag(TAG_FACE).embedding)
+        face_frames.append(f)
 
     # embeddings is now a list of all the valid embeddings
     # frametags is a list of all the frametagdicts
 
-    logging.debug("number of faces to cluster:%s",len(face_frames))
     if len(face_frames)==0:
         print("No faces to cluster")
         return
 
     # Convert list of embeddings to a numpy array for efficient computation
+    print(f"Start clustering {len(face_frames)} faces.")
     X = np.array(embeddings)
 
     # Step 2: Perform DBSCAN clustering
@@ -138,7 +145,6 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, limit=None):
             p.process(f)
 
 
-    # cluster.html is now made. On a mac just open it
 
 
 if __name__=="__main__":

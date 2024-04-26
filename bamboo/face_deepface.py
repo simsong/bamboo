@@ -123,7 +123,7 @@ class DeepFaceTagFaces(Stage):
                                       detector_backend = self.face_detector,
                                       align = True,
                                       expand_percentage = expand_percentage)
-        except ValueError as e:
+        except (ValueError,ZeroDivisionError) as e:
                 print(f"{f} DeepFace error {str(e)[0:100]}")
                 return
 
@@ -133,17 +133,20 @@ class DeepFaceTagFaces(Stage):
             if ('embedding' in found) and any_nan(found['embedding']):
                 del found['embedding']
 
-            kwargs = {}
+            rect = {}
             if 'facial_area' in found:
                 facial_area = found['facial_area']
-                kwargs = {'xy':(facial_area['x'],facial_area['y']),
+                rect = {'xy':(facial_area['x'],facial_area['y']),
                           'w':facial_area['w'],
                           'h':facial_area['h']}
 
-            if self.engine == deepface.DeepFace.analyze:
-                print("found=",found)
+            if 'region' in found:
+                region = found['region']
+                rect = {'xy':(region['x'],region['y']),
+                          'w':region['w'],
+                          'h':region['h']}
 
-            f.add_tag(Tag(TAG_FACE, **{**found,**kwargs} ))
+            f.add_tag(Tag(TAG_FACE, **{**found,**rect} ))
         self.output(f)
 
 

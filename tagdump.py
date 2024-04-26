@@ -5,12 +5,22 @@ Dump the contents of a file as pickles
 import pickle
 import json
 
+def dump_keys(obj, indent):
+    if not isinstance(obj,dict):
+        return
+    for (k,v) in obj.items():
+        print(" "*indent, k, type(v))
+        if isinstance(v,dict):
+            dump_keys(v,indent+4)
+        if isinstance(v,list):
+            for i in v:
+                dump_keys(i,indent+4)
+
+
 def dump(fname):
     with open(fname,"rb") as p:
-        obj = pickle.load(p)
-        print(obj)
-        g = obj['tag']
-        print("g=",g,json.dumps(g.dict()))
+        obj = json.load(p)
+    dump_keys(obj,indent=0)
 
 
 if __name__=="__main__":

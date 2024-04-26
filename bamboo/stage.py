@@ -11,6 +11,7 @@ import uuid
 import shelve
 import pickle
 import logging
+import copy
 from collections import defaultdict
 from abc import ABC,abstractmethod
 from filelock import FileLock
@@ -29,16 +30,17 @@ class Stage(ABC):
 
     registered_stages = []
 
-    def __init__(self):
+    def __init__(self, input_filter=None, output_filter=None):
         self.next_stages = set()
         self.config  = {}
         self.sum_t   = 0
         self.sum_t2  = 0
         self.count   = 0
         self.pipeline = None    # my pipeline
+        self.input_filter = input_filter
+        self.output_filter = output_filter
         self.registered_stages.append(self)
 
-    @abstractmethod
     def process(self, f:Frame):
         """Called to process. Default behavior is to copy frame to output."""
         self.output(f)
@@ -48,7 +50,8 @@ class Stage(ABC):
         """called at the start of processing of this stage.
         Processes and then passes the frame to the output stages."""
         t0 = time.time()
-        self.process(f)
+        if (self.input_filter is None) or self.input_filter(f):
+            self.process(f)
         t = time.time() - t0
         self.sum_t  += t
         self.sum_t2 += (t*t)
@@ -58,6 +61,8 @@ class Stage(ABC):
         """output(f) queues f for output when the current stage is done.
         If f is modified, it needs to be copied.
         """
+        if (self.output_filter is not None) and not self.output_filter(f):
+            return            # filtered out
         for s in self.next_stages:
             self.pipeline.queue_output_stage_frame_pair( (s,f) )
 
@@ -84,8 +89,8 @@ class Stage(ABC):
 class ShowFrames(Stage):
     """Pipeline that shows every frame coming through, and then copy to outpu"""
     wait = None
-    def __init__(self, wait=None):
-        super().__init__()
+    def __init__(self, wait=None, **kwargs):
+        super().__init__(**kwargs)
         if wait is not None:
             self.wait=wait
     def process(self, f:Frame):
@@ -96,8 +101,8 @@ class ShowFrames(Stage):
 class ShowTags(Stage):
     """Pipeline that shows the tags for every frame that has a tag, and then copy to output"""
     wait = None
-    def __init__(self, wait=None):
-        super().__init__()
+    def __init__(self, wait=None, **kwargs):
+        super().__init__(**kwargs)
         if wait is not None:
             self.wait=wait
     def process(self, f:Frame):
@@ -106,29 +111,22 @@ class ShowTags(Stage):
         self.output(f)
 
 class Multiplex(Stage):
-    """Simply copies from intputs to outputs. ."""
-    def process(self, f:Frame):
-        self.output(f)
+    """Simply copies from intputs to outputs. They all do this"""
 
 
 class FilterFrames(Stage):
-    def __init__(self, *, framefilter ):
-        """Filter tags according to tagfiler"""
-        super().__init__()
-        self.framefilter = framefilter
-
-    def process(self, f: Frame):
-        if self.framefilter(f):
-            self.output(f)
+        """Filter tags according to input_filter or output_filter.
+        These are implemented in the base class, so the default implementation works fine.
+        """
 
 
 class SaveFramesToDirectory(Stage):
-    def __init__(self, root, *, template=DEFAULT_JPG_TEMPLATE, nonstop=False):
+    def __init__(self, root, *, template=DEFAULT_JPG_TEMPLATE, nonstop=False, **kwargs):
         """Save the images to the directory, record the path where written, and move on.
         Format is determined by template.
         :param nonstop: - If True, do not stop for failed writer
         """
-        super().__init__()
+        super().__init__(**kwargs)
         self.root     = root
         self.counter  = 0
         self.error_counter = 0
@@ -137,7 +135,11 @@ class SaveFramesToDirectory(Stage):
 
     def process(self, f:Frame):
         f = f.copy()
-        path = os.path.join(self.root, self.template.format(counter=self.counter))
+        while True:
+            path = os.path.join(self.root, self.template.format(counter=self.counter))
+            if not os.path.exists(path):
+                break
+            self.counter += 1
 
         # Save and increment counter
         try:
@@ -153,11 +155,11 @@ class SaveFramesToDirectory(Stage):
         self.output(f)
 
 class WriteFrameObjectsToDirectory(Stage):
-    def __init__(self, root, *, template=DEFAULT_JSON_TEMPLATE, nonstop=False):
+    def __init__(self, root, *, template=DEFAULT_JSON_TEMPLATE, nonstop=False, **kwargs):
         """Write the images to the directory, record the path where written, and move on.
         :param nonstop: - If True, do not stop for failed writer
         """
-        super().__init__()
+        super().__init__(**kwargs)
         self.root     = root
         self.counter  = 0
         self.error_counter = 0
@@ -165,7 +167,11 @@ class WriteFrameObjectsToDirectory(Stage):
         self.nonstop  = nonstop
 
     def process(self, f:Frame):
-        path = os.path.join(self.root, self.template.format(counter=self.counter))
+        while True:
+            path = os.path.join(self.root, self.template.format(counter=self.counter))
+            if not os.path.exists(path):
+                break
+            self.counter += 1
 
         # Save and increment counter
         try:
@@ -206,10 +212,11 @@ div.images {
     IMAGES_END_HTML = "</div>\n"
     IMAGES_MORE_HTML="..."
     CLUSTER_END_HTML = "</div>\n"
-    IMAGE_HTML = "<div class='face'><img src='{urn}' class='Image'/><div class='caption'>{caption}</div></div>"
-    def __init__(self, *, path:str, image_width=72, image_height=72):
+    IMAGE_HTML = "<div class='face'><a href='{src_urn}'><img src='{urn}' class='Image'/></a><div class='caption'>{caption}</div></div>"
+
+    def __init__(self, *, path:str, image_width=72, image_height=72, **kwargs):
         """Create an HTML file with all of the frames. Each frame must have a tag called GALLERY_KEY."""
-        super().__init__()
+        super().__init__(**kwargs)
         self.path = path
         self.image_width = image_width
         self.image_height = image_height
@@ -225,23 +232,33 @@ div.images {
         with open( self.path, "w") as c:
             c.write(self.HTML_HEAD)
             for (cluster_number,frames) in sorted(self.frames_by_key.items()) :
+                clargs = {'cluster_number':cluster_number,
+                        'caption':'',
+                        'src_urn':'',
+                        'src':'',
+                        'frames_in_cluster':len(frames)}
+                args = copy.copy(clargs)
                 c.write(self.CLUSTER_START_HTML)
-                c.write(self.CLUSTER_TITLE_HTML.format(cluster_number=cluster_number,
-                                                  frames_in_cluster=len(frames)))
-                c.write(self.IMAGES_START_HTML)
+                c.write(self.CLUSTER_TITLE_HTML.format(**args))
+                c.write(self.IMAGES_START_HTML.format(**args))
                 for (ct,f) in enumerate(frames):
+                    args = copy.copy(clargs)
                     if ct==self.MAX_IMAGES_PER_CLUSTER:
                         c.write( self.IMAGES_MORE_HTML)
                         break
                     t = f.findfirst_tag(WriteFramesToHTMLGallery_tag)
                     if t:
-                        caption = t.caption
-                        print("caption:",caption)
-                    else:
-                        caption = ''
-                    c.write( self.IMAGE_HTML.format(urn=f.urn, caption=caption))
-                c.write(self.IMAGES_END_HTML)
-                c.write(self.CLUSTER_END_HTML)
+                        args['caption'] = t.caption
+
+                    args['urn']     = f.urn
+                    try:
+                        args['src_urn'] = f.history[0][1]
+                    except KeyError:
+                        pass
+
+                    c.write( self.IMAGE_HTML.format(**args))
+                c.write(self.IMAGES_END_HTML.format(**args))
+                c.write(self.CLUSTER_END_HTML.format(**args))
             c.write(self.HTML_FOOT)
 
 def Connect(prev_:Stage, next_:Stage):

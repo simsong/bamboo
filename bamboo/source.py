@@ -25,7 +25,7 @@ import cv2
 import numpy as np
 import hashlib
 
-from .frame import Frame
+from .frame import Frame,NotImageError
 from .constants import C
 from .image_utils import img_sim
 
@@ -40,13 +40,11 @@ class SourceOptions:
         self.frameHeight = None
         self.counter = 0
         for (k,v) in kwargs.items():
-            print("set",k,v)
             setattr(self,k,v)
-        print("self.limit=",self.limit)
+
 
     def draw(self):
         """Return True if we should sample."""
-        print("self.limit=",self.limit)
         return self.sampling >= random.random()
 
     def atlimit(self):
@@ -87,29 +85,27 @@ def FrameStream(root, o:SourceOptions=SourceOptions(), verbose=False):
                 mtype = mimetypes.guess_type(fname)[0]
                 if mtype is None:
                     continue
-                if mtype.split("/")[0] in ['video','image']:
-                    if o.draw():
-                        if os.path.getsize(path)>0:
-                            try:
-                                f = Frame(urn=path, mime_type=mtype)
-                            except FileNotFoundError as e:
-                                print(f"Cannot read '{path}': {e}",file=sys.stderr)
-                                continue
-                            yield f
-                            if o.atlimit():
-                                return
+                if mtype in ["application/image","application/json"]:
+                    if not o.draw():
+                        continue
+                if mtype in "application/image":
+                    if os.path.getsize(path)>0:
+                        try:
+                            f = Frame(urn=path, mime_type=mtype)
+                        except FileNotFoundError as e:
+                            print(f"Cannot read '{path}': {e}",file=sys.stderr)
+                            continue
+                        yield f
                 if mtype=='application/json':
-                    if o.draw():
-                        with open(path,"r") as fd:
-                            yield Frame.fromJSON(fd.read())
-                        if o.atlimit():
-                            return
+                    with open(path,"r") as fd:
+                        yield Frame.fromJSON(fd.read())
+                if o.atlimit():
+                    return
 
     else:
         yield Frame(urn=root)
 
-def DissimilarFrameStream(root, o=SourceOptions()):
-    print("dfs. o.limit=",o.limit)
+def DissimilarFrameStream(root, o=SourceOptions(), output_filter=None):
     ref = None
     count = 0
     for f in FrameStream(root, o=o): # do not pass options
@@ -120,6 +116,11 @@ def DissimilarFrameStream(root, o=SourceOptions()):
             continue
         except FileNotFoundError as e:
             print(f"Cannot read '{f.urn}': {e}",file=sys.stderr)
+            continue
+        except NotImageError as e:
+            print(f"Not an image file '{f.urn}': {e}",file=sys.stderr)
+            continue
+        if output_filter and not output_filter(f):
             continue
         if st < o.score:
             if o.draw():

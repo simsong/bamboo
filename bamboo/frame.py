@@ -35,6 +35,9 @@ TAG_FACE='face'
 TAG_FACE_COUNT='face_count'
 TAG_SKIPPED='skipped'
 
+class NotImageError(RuntimeError):
+    """cv2 cannot read image"""
+
 def json_loads_removing_version(d):
     nd = json.loads(d)
     if 'version' in nd:
@@ -63,11 +66,10 @@ def image_read(urn):
     assert urn is not None
     img = cv2.imdecode(np.frombuffer( bytes_read(urn), np.uint8), cv2.IMREAD_ANYCOLOR)
     if img is None:
-        raise FileNotFoundError("cannot read:"+urn)
+        raise RuntimeError(urn)
+        raise NotImageError("cannot read:"+urn)
 
-    print("img.shape=",img.shape)
     if len(img.shape)==2:
-        print("READ GRAYSCALE; CONVERTING TO COLOR")
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
     img.flags.writeable = False
@@ -164,9 +166,17 @@ class Frame:
             raise ValueError(f"Cannot load Frame JSON version {kwargs['version']}")
 
 
+    @property
+    def src_urn(self):
+        try:
+            if self.history[0][0]==P_URN:
+                return self.history[0][1]
+        except (IndexError,KeyError):
+            pass
+        return None
+
     def save(self, urn):
         """Write the image to a file as a JPEG"""
-        print("f=",self)
         logging.debug("save urn=%s self=%s",urn,self)
         bamboo_save(urn, self.jpeg_bytes)
         self.history.append([P_URN,urn])
@@ -267,7 +277,6 @@ class Frame:
 
     def crop(self, *, xy, w, h):
         """Return a new Frame that is the old one cropped. So copy over the provenance. Tags are not copied."""
-        print("xy=",xy,"w=",w,"h=",h)
         cropped_img = np.copy( self.img[xy[1]:xy[1]+h, xy[0]:xy[0]+w])
         history     = copy.copy(self.history)
         history.append([P_CROP, (xy,(w,h))])

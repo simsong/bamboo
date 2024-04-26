@@ -1,3 +1,5 @@
+- Stages can be generators. Should the be? Our sources.
+
 Project-based development.
 
 

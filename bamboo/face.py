@@ -9,7 +9,6 @@ from .stage import Stage
 
 def scale_from_center(*, xy, w, h, scale=1.0, make_ints=True):
     """Given an xy[] point, a width and height, scale it and return a new xy, w, h triple"""
-    print("scale_from_center",xy,w,h,scale,make_ints)
     assert w>=0
     assert h>=0
     center_x = xy[0] + w/2

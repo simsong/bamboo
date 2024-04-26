@@ -11,7 +11,7 @@ from abc import ABC,abstractmethod
 import atexit
 import logging
 
-from .frame import Frame
+from .frame import Frame,NotImageError
 from .stage import Connect,validate_stage
 
 
@@ -89,4 +89,11 @@ class SingleThreadedPipeline(Pipeline):
             except IndexError:
                 break
             logging.debug("<%s> processing %s",s.__class__.__name__,f)
-            s._run_frame(f)
+            try:
+                s._run_frame(f)
+            except FileNotFoundError as e:
+                print(f"Cannot read '{f.urn}': {e}",file=sys.stderr)
+                continue
+            except NotImageError as e:
+                print(f"Not an image file '{f.urn}': {e}",file=sys.stderr)
+                continue
