@@ -12,6 +12,7 @@ import shelve
 import pickle
 import logging
 import copy
+import urllib
 from collections import defaultdict
 from abc import ABC,abstractmethod
 from filelock import FileLock
@@ -191,7 +192,7 @@ class WriteFrameObjectsToDirectory(Stage):
 
 WriteFramesToHTMLGallery_tag="bamboo.stage.WriteFramesToHTMLGallery.tag"
 class WriteFramesToHTMLGallery(Stage):
-    MAX_IMAGES_PER_CLUSTER = 10
+    MAX_IMAGES_PER_CLUSTER = -1
     HTML_HEAD = """
 <html>
 <style>
@@ -201,7 +202,11 @@ width:128px;
 }
 div.images {
  display:flex;
+    flex-wrap: wrap;
 }
+.face {
+    margin: 1px;
+    }
 </style>
 <body>
     """

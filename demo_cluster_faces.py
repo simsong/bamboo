@@ -51,7 +51,7 @@ class CaptionFaces(Stage):
             f.add_tag( Tag(WriteFramesToHTMLGallery_tag, caption=caption))
         super().process(f)      # and continue processing
 
-def cluster_faces(*, rootdir, facedir, tagdir, show, limit=None):
+def cluster_faces(*, rootdir, facedir, tagdir, show, out, epsilon,limit=None):
     os.makedirs(tagdir, exist_ok=True)
     os.makedirs(facedir, exist_ok=True)
 
@@ -129,7 +129,7 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, limit=None):
     # DBSCAN parameters like eps and min_samples can be adjusted based on your
     # specific dataset and needs
     with timer.Timer("time to cluster"):
-        dbscan = DBSCAN(eps=0.5, min_samples=2, metric='precomputed')
+        dbscan = DBSCAN(eps=epsilon, min_samples=2, metric='precomputed', n_jobs=-1)
         clusters = dbscan.fit_predict(cosine_distances(X))
 
     maxcluster = max(clusters)
@@ -137,7 +137,7 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, limit=None):
 
     # Generate the gallery with a second pipeline, where the key for the gallery comes from the cluster number
     with SingleThreadedPipeline() as p:
-        p.addLinearPipeline([WriteFramesToHTMLGallery(path='cluster.html')])
+        p.addLinearPipeline([WriteFramesToHTMLGallery(path=out)])
 
         for (cluster,f) in zip(clusters,face_frames):
             logging.debug("cluster %s frame %s",cluster,f)
@@ -158,11 +158,13 @@ if __name__=="__main__":
     parser.add_argument("--dump",help="dump the database before clustering",action='store_true')
     parser.add_argument("--show", help="Show faces as they are ingested", action='store_true')
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--epsilon", type=float, default=0.5, help="DBSCAN parameter")
+    parser.add_argument("--out", help="output html file", default="cluster.html")
     clogging.add_argument(parser, loglevel_default='WARNING')
     args = parser.parse_args()
     clogging.setup(level=args.loglevel)
 
     if args.rootdir and not args.facedir:
         raise RuntimeError("--add requires --facedir")
-    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.tagdir, show=args.show, limit=args.limit)
-    subprocess.call(['open','cluster.html'])
+    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.tagdir, show=args.show, out=args.out, epsilon=args.epsilon,limit=args.limit)
+    subprocess.call(['open',args.out])
