@@ -129,4 +129,4 @@ if __name__=="__main__":
     if args.rootdir and not args.facedir:
         raise RuntimeError("--add requires --facedir")
 
-    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.dagdir, dump=args.dump, show=args.show)
+    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.tagdir, dump=args.dump, show=args.show)
