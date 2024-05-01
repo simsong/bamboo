@@ -19,8 +19,8 @@ from filelock import FileLock
 
 from .frame import Frame,FrameTagDict
 
-DEFAULT_JPG_TEMPLATE="frame{counter:08}.jpg"
-DEFAULT_JSON_TEMPLATE="frame{counter:08}.json"
+DEFAULT_JPEG_TEMPLATE="{counter//1000:03}/frame{counter:08}.jpg"
+DEFAULT_JSON_TEMPLATE="{counter//1000:03}/frame{counter:08}.json"
 
 def validate_stage(stage):
     if not hasattr(stage,'count'):
@@ -95,7 +95,7 @@ class ShowFrames(Stage):
         if wait is not None:
             self.wait=wait
     def process(self, f:Frame):
-        f.show(title=f.src, wait=self.wait)
+        f.show(title=f.urn, wait=self.wait)
         self.output(f)
 
 
@@ -122,7 +122,7 @@ class FilterFrames(Stage):
 
 
 class SaveFramesToDirectory(Stage):
-    def __init__(self, root, *, template=DEFAULT_JPG_TEMPLATE, nonstop=False, **kwargs):
+    def __init__(self, root, *, template=DEFAULT_JPEG_TEMPLATE, nonstop=False, **kwargs):
         """Save the images to the directory, record the path where written, and move on.
         Format is determined by template.
         :param nonstop: - If True, do not stop for failed writer

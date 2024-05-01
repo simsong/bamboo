@@ -15,15 +15,24 @@ from .frame import Frame,NotImageError
 from .stage import Connect,validate_stage
 
 
+logger = logging.getLogger(__name__)
+
 class Pipeline(ABC):
     """Base pipeline class"""
-    def __init__(self, verbose=False):
+    def __init__(self, verbose=False, debug=False):
         self.queued_output_stage_frame_pairs = collections.deque()
         self.head = None
         self.stages = set()
         self.count  = 0
         self.running = False
         self.verbose = verbose
+        self.debug   = debug
+        if debug:
+            logger.setLevel(logging.DEBUG)
+        elif verbose:
+            logger.setLevel(logging.INFO)
+        else:
+            logger.setLevel(logging.WARNING)
 
     def queue_output_stage_frame_pair(self, pair):
         self.queued_output_stage_frame_pairs.append(pair)
@@ -42,13 +51,12 @@ class Pipeline(ABC):
         if not self.running:
             raise RuntimeError("pipeline not running")
         self.count += 1
-        if self.verbose:
-            print("process",f)
+        logger.info("== process %s",f)
         self.queue_output_stage_frame_pair( (self.head, f))
         self.run_queue()
 
-    def process_list(self, flist, verbose=False):
-        self.verbose = verbose
+    def process_list(self, flist):
+        logger.info("== process_list ==")
         for f in flist:
             self.process(f)
 
@@ -88,7 +96,10 @@ class SingleThreadedPipeline(Pipeline):
                 (s,f) = self.queued_output_stage_frame_pairs.popleft()
             except IndexError:
                 break
-            logging.debug("<%s> processing %s",s.__class__.__name__,f)
+            logger.debug("<%s> processing %s",s.__class__.__name__,f)
+            if self.debug:
+                for t in f.tags:
+                    logger.debug("   tag %s",t.dict())
             try:
                 s._run_frame(f)
             except FileNotFoundError as e:

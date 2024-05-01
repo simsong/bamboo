@@ -83,6 +83,7 @@ class DeepFaceTagFaces(Stage):
     :param: scale - enlarge boxes around faces.
     """
 
+    MIN_FACE_CONFIDENCE = 0.25
     def __init__(self,
                  embeddings=True,
                  analyze=False,
@@ -128,10 +129,9 @@ class DeepFaceTagFaces(Stage):
                 return
 
         for found in found_faces:
-            # deepface sometimes creates embeddings with nan's.
-            # If we find them, remove them
-            if ('embedding' in found) and any_nan(found['embedding']):
-                del found['embedding']
+            # Ignore if face confidence is too low
+            if 'face_confidence' in found and found['face_confidence'] < self.MIN_FACE_CONFIDENCE:
+                continue
 
             rect = {}
             if 'facial_area' in found:
@@ -146,18 +146,26 @@ class DeepFaceTagFaces(Stage):
                           'w':region['w'],
                           'h':region['h']}
 
+            # deepface sometimes creates embeddings with nan's.
+            # If we find them, remove them
+            if ('embedding' in found) and any_nan(found['embedding']):
+                del found['embedding']
+
             f.add_tag(Tag(TAG_FACE, **{**found,**rect} ))
         self.output(f)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('image', type=str, help="image path")
+    parser = argparse.ArgumentParser(description="Test program for deepface. Run on a file or directory and dump the results.",
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--root', type=str, help="image path")
+    parser.add_argument('--verbose', action='store_true')
+    parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
-    p = SingleThreadedPipeline()
-    p.addLinearPipeline([ DeepFaceTagFaces(detector_backend='yolov8'),
-                          ShowTags(wait=0),
-                          ExtractFacesToFrames(scale=1.3),
-                          ShowFrames(wait=0) ])
-    p.process_stream(  FrameStream(root=args.image))
+    with SingleThreadedPipeline(verbose=args.verbose, debug=args.debug) as p:
+        p.addLinearPipeline([ DeepFaceTagFaces(face_detector='yolov8'),
+                              ShowTags(wait=0),
+                              ExtractFacesToFrames(scale=1.3),
+                              ShowFrames(wait=0) ])
+        p.process_list(  FrameStream(root=args.root))
