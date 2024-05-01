@@ -55,10 +55,14 @@ class Pipeline(ABC):
         self.queue_output_stage_frame_pair( (self.head, f))
         self.run_queue()
 
-    def process_list(self, flist):
+    def process_list(self, flist, verbose=None):
         logger.info("== process_list ==")
+        old_verbose = self.verbose
+        if verbose is not None:
+            self.verbose = verbose
         for f in flist:
             self.process(f)
+        self.verbose = old_verbose
 
     def process_stream(self, fstream):
         for f in fstream:

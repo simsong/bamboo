@@ -143,3 +143,6 @@ Do we want to have an abstract pipeline object?
 * https://dl.acm.org/doi/10.1145/2733373.2806229
 * https://ieeexplore.ieee.org/document/7225141
 * https://ieeexplore.ieee.org/document/8438958
+
+To test the deepface tagger:
+python -m bamboo.face_deepface --debug --root <dir>

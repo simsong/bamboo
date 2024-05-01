@@ -67,7 +67,7 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, out, epsilon,limit=None):
     # If a rootdir was specified, analyze the images and write all of the frames that have
     # and embedding
     if rootdir:
-        with SingleThreadedPipeline() as p:
+        with SingleThreadedPipeline( verbose=True ) as p:
             p.addLinearPipeline([
                 # For each frame, tag all of the faces:
                 dt:= DeepFaceTagFaces(face_detector='yolov8', embeddings=True),
@@ -101,8 +101,7 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, out, epsilon,limit=None):
                     return False
                 return True
 
-            p.process_list( DissimilarFrameStream( rootdir, o=so, output_filter=not_seen ),
-                            verbose=True )
+            p.process_list( DissimilarFrameStream( rootdir, o=so, output_filter=not_seen ))
 
     # Now gather all of the paths and embeddings in order
     embeddings = []
