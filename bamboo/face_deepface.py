@@ -75,6 +75,7 @@ def any_nan(vect):
 
 class DeepFaceTagFaces(Stage):
     """
+    Find the faces and add tags.
     :param: embedding - also produce embeddings.
     :param: analyze - also produce face analysis.
     :param: model_name - which model to use.
@@ -84,6 +85,8 @@ class DeepFaceTagFaces(Stage):
     """
 
     MIN_FACE_CONFIDENCE = 0.25
+    MIN_FACE_WIDTH = 32
+    MIN_FACE_HEIGHT = 32
     def __init__(self,
                  embeddings=True,
                  analyze=False,
@@ -97,7 +100,7 @@ class DeepFaceTagFaces(Stage):
         assert normalization in deepface_normalization_names()
 
         if embeddings and analyze:
-            raise ValueError("Currently DeepFaceTagFaces can only generate embeddings or attributes.")
+            raise ValueError("Currently DeepFaceTagFaces can only generate embeddings or attributes, but not both at the same time.")
 
         if embeddings:
             def eng(*args,**kwargs):
@@ -125,8 +128,11 @@ class DeepFaceTagFaces(Stage):
                                       align = True,
                                       expand_percentage = expand_percentage)
         except (ValueError,ZeroDivisionError) as e:
-                print(f"{f} DeepFace error {str(e)[0:100]}")
-                return
+            print(f"{f} DeepFace error {str(e)[0:100]}")
+            return
+        except (cv2.error) as e:
+            print(f"{f} DeepFace cv2.error {str(e)[0:100]}")
+            return
 
         for found in found_faces:
             # Ignore if face confidence is too low
@@ -145,6 +151,10 @@ class DeepFaceTagFaces(Stage):
                 rect = {'xy':(region['x'],region['y']),
                           'w':region['w'],
                           'h':region['h']}
+
+            # ignore if face is too small
+            if (rect['w']<self.MIN_FACE_WIDTH) or (rect['h']<self.MIN_FACE_HEIGHT):
+                continue
 
             # deepface sometimes creates embeddings with nan's.
             # If we find them, remove them

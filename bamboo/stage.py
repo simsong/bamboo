@@ -209,6 +209,7 @@ class WriteFramesToHTMLGallery(Stage):
 <style>
 img.Image {
 max-width:128px;
+max-height: 128px;
 width:128px;
 }
 div.images {

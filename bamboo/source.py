@@ -83,7 +83,6 @@ def FrameStream(root, o:SourceOptions=SourceOptions(), verbose=False):
             for fname in sorted(filenames):
                 path = os.path.join(dirpath, fname)
                 mtype = mimetypes.guess_type(fname)[0]
-                print(path,mtype)
                 if mtype is None:
                     continue
                 if mtype in ["image/jpeg", "application/json"]:
