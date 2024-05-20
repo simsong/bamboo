@@ -86,10 +86,10 @@ def FrameStream(root, o:SourceOptions=SourceOptions(), verbose=False):
                 print(path,mtype)
                 if mtype is None:
                     continue
-                if mtype in ["image/jpeg", "application/json"]:
+                elif mtype in ["image/jpeg", "application/json"]:
                     if not o.draw():
                         continue
-                if mtype in "image/jpeg":
+                elif mtype in "image/jpeg":
                     if os.path.getsize(path)>0:
                         try:
                             f = Frame(urn=path, mime_type=mtype)
@@ -97,9 +97,26 @@ def FrameStream(root, o:SourceOptions=SourceOptions(), verbose=False):
                             print(f"Cannot read '{path}': {e}",file=sys.stderr)
                             continue
                         yield f
-                if mtype=='application/json':
+                elif mtype=='application/json':
                     with open(path,"r") as fd:
                         yield Frame.fromJSON(fd.read())
+                elif mtype=='video/mp4':
+                    cap = cv2.VideoCapture(path)
+                    counter = 0
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret:
+                            break;
+                        if len(frame)==0:
+                            continue
+                        counter += 1
+                        urn = f"{path}?frame={counter}"
+                        f = Frame(urn=urn,img=frame)
+                        yield f
+                        if o.atlimit():
+                            return
+                else:
+                    print(f"Unknown mtype {mtype}")
                 if o.atlimit():
                     return
 
@@ -123,6 +140,7 @@ def DissimilarFrameStream(root, o=SourceOptions(), output_filter=None):
             continue
         if output_filter and not output_filter(f):
             continue
+        print(f"st={st} o.score={o.score}")
         if st < o.score:
             if o.draw():
                 yield f

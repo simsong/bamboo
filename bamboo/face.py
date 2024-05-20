@@ -34,9 +34,9 @@ class ExtractFacesToFrames(Stage):
     Consumes the input frames.
     """
     scale = 1.0
-    def __init__(self, scale=1.0):
+    def __init__(self, scale=1.0, verbose=False):
         """:param scale: allows a region larger than the recognized face to be selected."""
-        super().__init__()
+        super().__init__(verbose=verbose)
         self.scale = scale
 
     def process(self, f:Frame):

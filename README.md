@@ -1,5 +1,5 @@
 # Bamboo
-Bamboo is a python module for building production-quality research pipelines for processing video and stillframe images.
+Bamboo is a python framework that makes it easy to build performant, production-quality research pipelines for processing video and stillframe images.
 
 ## Features
 

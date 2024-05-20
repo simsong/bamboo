@@ -19,6 +19,7 @@ import json
 import copy
 import errno
 import logging
+import urllib.parse
 
 import cv2
 import numpy as np
@@ -122,7 +123,8 @@ class Frame:
             try:
                 self.mtime = datetime.fromisoformat( os.path.splitext(os.path.basename(urn))[0] )
             except ValueError:
-                self.mtime = datetime.fromtimestamp(os.path.getmtime(urn))
+                o = urllib.parse.urlparse(urn)
+                self.mtime = datetime.fromtimestamp(os.path.getmtime(o.path))
         elif img is not None:
             self.mtime = datetime.now()
 

@@ -31,7 +31,7 @@ class Stage(ABC):
 
     registered_stages = []
 
-    def __init__(self, input_filter=None, output_filter=None):
+    def __init__(self, input_filter=None, output_filter=None, verbose=False):
         self.next_stages = set()
         self.config  = {}
         self.sum_t   = 0
@@ -40,6 +40,7 @@ class Stage(ABC):
         self.pipeline = None    # my pipeline
         self.input_filter = input_filter
         self.output_filter = output_filter
+        self.verbose = verbose
         self.registered_stages.append(self)
 
     def process(self, f:Frame):
@@ -90,12 +91,14 @@ class Stage(ABC):
 class ShowFrames(Stage):
     """Pipeline that shows every frame coming through, and then copy to outpu"""
     wait = None
-    def __init__(self, wait=None, **kwargs):
+    def __init__(self, wait=None, title=None, **kwargs):
         super().__init__(**kwargs)
+        self.title = title
         if wait is not None:
             self.wait=wait
     def process(self, f:Frame):
-        f.show(title=f.src, wait=self.wait)
+        title = self.title if self.title is not None else f.src
+        f.show(title=title, wait=self.wait)
         self.output(f)
 
 
