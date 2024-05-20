@@ -19,27 +19,45 @@ import copy
 import mimetypes
 import logging
 import pickle
+import random
 
 import cv2
 import numpy as np
 import hashlib
 
-from .frame import Frame
+from .frame import Frame,NotImageError
 from .constants import C
 from .image_utils import img_sim
 
 DEFAULT_SCORE = 0.90
 class SourceOptions:
-    __slots__=('limit','sampling','mime_type','score','frameWidth','frameHeight')
+    __slots__=('limit','sampling','mime_type','score','frameWidth','frameHeight','counter')
     def __init__(self,**kwargs):
+        self.limit = None
+        self.sampling = 1.0     # fraction we keep
         self.score = DEFAULT_SCORE
         self.frameWidth = None
         self.frameHeight = None
-        for (k,v) in kwargs:
+        self.counter = 0
+        for (k,v) in kwargs.items():
             setattr(self,k,v)
 
 
-def FrameFromFile(path, o=SourceOptions()):
+    def draw(self):
+        """Return True if we should sample."""
+        return self.sampling >= random.random()
+
+    def atlimit(self):
+        """Increment counter and return True if we are at the limit."""
+        self.counter += 1
+        if self.limit is None:
+            return False
+        elif self.counter >= self.limit:
+            return True
+        return False
+
+
+def FrameFromFile(path, o:SourceOptions=SourceOptions()):
     if o.mime_type is None:
         o.mine_type = mimetypes.guess_type(path)[0].split("/")[0]
     if o.mime_type == 'image':
@@ -50,53 +68,90 @@ def FrameFromFile(path, o=SourceOptions()):
             ret, img = cap.read()
             if not ret:
                 break
-            yield frame.Frame(img = img,
-                              src=pathlib.Path(absolute_path_string).as_uri() + "?frame="+ct)
+            if o.draw():
+                yield frame.Frame(img = img,
+                                  src=pathlib.Path(absolute_path_string).as_urn() + "?frame="+ct)
+                if o.atlimit():
+                    return
 
-
-def FrameStream(root, o=SourceOptions()):
+def FrameStream(root, o:SourceOptions=SourceOptions(), verbose=False):
     """Generator for a series of Frame() objects from a disk file.
     Returns frames in sort order within each directory"""
     if os.path.isdir(root):
         for (dirpath, dirnames, filenames) in os.walk(root): # pylint: disable=unused-variable
             dirnames.sort()                                  # makes the directories recurse in sort order
             for fname in sorted(filenames):
+                path = os.path.join(dirpath, fname)
                 mtype = mimetypes.guess_type(fname)[0]
                 if mtype is None:
                     continue
-                if mtype.split("/")[0] in ['video','image']:
-                    path = os.path.join(dirpath, fname)
+                elif mtype in ["image/jpeg", "application/json"]:
+                    if not o.draw():
+                        continue
+                elif mtype in "image/jpeg":
                     if os.path.getsize(path)>0:
                         try:
-                            f = Frame(path=path, mime_type=mtype)
+                            f = Frame(urn=path, mime_type=mtype)
                         except FileNotFoundError as e:
                             print(f"Cannot read '{path}': {e}",file=sys.stderr)
                             continue
                         yield f
-    else:
-        yield Frame(path=root)
+                elif mtype=='application/json':
+                    with open(path,"r") as fd:
+                        yield Frame.fromJSON(fd.read())
+                elif mtype=='video/mp4':
+                    cap = cv2.VideoCapture(path)
+                    counter = 0
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret:
+                            break;
+                        if len(frame)==0:
+                            continue
+                        counter += 1
+                        urn = f"{path}?frame={counter}"
+                        f = Frame(urn=urn,img=frame)
+                        yield f
+                        if o.atlimit():
+                            return
+                else:
+                    print(f"Unknown mtype {mtype}")
+                if o.atlimit():
+                    return
 
-def DissimilarFrameStream(root, o=SourceOptions):
+    else:
+        yield Frame(urn=root)
+
+def DissimilarFrameStream(root, o=SourceOptions(), output_filter=None):
     ref = None
     count = 0
-    for f in FrameStream(root):
+    for f in FrameStream(root, o=o): # do not pass options
         try:
             st = f.similarity(ref)
         except cv2.error as e: # pylint: disable=catching-non-exception
-            print(f"Error: {e} with {f.path}",file=sys.stderr)
+            print(f"Error: {e} with {f.urn}",file=sys.stderr)
             continue
         except FileNotFoundError as e:
-            print(f"Cannot read '{f.path}': {e}",file=sys.stderr)
+            print(f"Cannot read '{f.urn}': {e}",file=sys.stderr)
             continue
+        except NotImageError as e:
+            print(f"Not an image file '{f.urn}': {e}",file=sys.stderr)
+            continue
+        if output_filter and not output_filter(f):
+            continue
+        print(f"st={st} o.score={o.score}")
         if st < o.score:
-            yield f
+            if o.draw():
+                yield f
+            if o.atlimit():
+                return
             ref = f
         else:
             count += 1
             logging.debug("count=%s skip %s",count,f)
 
 
-def CameraFrameStream(camera=0, o=SourceOptions()):
+def CameraFrameStream(camera=0, o:SourceOptions=SourceOptions()):
     # https://docs.opencv.org/3.4/dd/d01/group__videoio__c.html
     cap = cv2.VideoCapture(camera)
     if o.frameWidth is not None:
@@ -107,14 +162,21 @@ def CameraFrameStream(camera=0, o=SourceOptions()):
         ret, img = cap.read()
         if not ret:
             break
-        yield Frame(src=f"camera{camera}")
+        if o.draw():
+            yield Frame(src=f"camera{camera}")
+        if o.atlimit():
+            return
 
-def TagsFromDirectory(path):
+def TagsFromDirectory(path, o:SourceOptions=SourceOptions()):
+    logging.debug("path=%s",path)
     for (dirpath, dirnames, filenames) in os.walk(path):
-        for name in os.listdir(path):
-            dirnames.sort()                                  # makes the directories recurse in sort order
-            for fname in sorted(filenames):
-                if name.endswith(".tag"):
-                    with open( os.path.join(dirpath, name), "rb") as f:
-                        v = pickle.load(f)
+        logging.debug("dirpath=%s",path)
+        dirnames.sort()                                  # makes the directories recurse in sort order
+        for fname in sorted(filenames):
+            if fname.endswith(".tag"):
+                with open( os.path.join(dirpath, fname), "rb") as f:
+                    v = pickle.load(f)
+                    if o.draw():
                         yield v
+                    if o.atlimit():
+                        return

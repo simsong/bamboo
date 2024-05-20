@@ -5,3 +5,5 @@ pyyaml
 deepface
 tf-keras
 scikit-learn
+boto3
+ultralytics

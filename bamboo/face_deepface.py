@@ -67,10 +67,29 @@ def deepface_normalization_names():
                 ret.add(m.group(1))
     return ret
 
+def any_nan(vect):
+    for v in vect:
+        if math.isnan(v):
+            return True
+    return False
 
+class DeepFaceTagFaces(Stage):
+    """
+    Find the faces and add tags.
+    :param: embedding - also produce embeddings.
+    :param: analyze - also produce face analysis.
+    :param: model_name - which model to use.
+    :param: face_detector - which face detector DeepFace should use.
+    :param: normalization - how to normalize faces
+    :param: scale - enlarge boxes around faces.
+    """
 
-class DeepFaceTag(Stage):
-    def __init__(self, embeddings=True, attributes=True,
+    MIN_FACE_CONFIDENCE = 0.25
+    MIN_FACE_WIDTH = 32
+    MIN_FACE_HEIGHT = 32
+    def __init__(self,
+                 embeddings=True,
+                 analyze=False,
                  model_name = 'VGG-Face',
                  face_detector='opencv',
                  normalization='base',
@@ -80,9 +99,20 @@ class DeepFaceTag(Stage):
         assert face_detector in deepface_detector_names()
         assert normalization in deepface_normalization_names()
 
-        self.embeddings = embeddings
-        self.attributes = attributes
-        self.model_name = model_name
+        if embeddings and analyze:
+            raise ValueError("Currently DeepFaceTagFaces can only generate embeddings or attributes, but not both at the same time.")
+
+        if embeddings:
+            def eng(*args,**kwargs):
+                return deepface.DeepFace.represent(*args,model_name=model_name,
+                                                   normalization = self.normalization,
+                                                   **kwargs)
+            self.engine = eng
+        elif analyze:
+            self.engine = deepface.DeepFace.analyze
+        else:
+            raise ValueError("Please specify embeddings=True or analyze=True")
+
         self.face_detector = face_detector
         self.normalization = normalization
         self.scale       = scale
@@ -91,32 +121,61 @@ class DeepFaceTag(Stage):
         # Detect Objects
         f = f.copy()            # we will be adding tags
         expand_percentage = (self.scale - 1.0) * 100
-        if self.embeddings or self.attributes:
-            for found in deepface.DeepFace.represent(f.img,
-                                                     model_name = self.model_name,
-                                                     enforce_detection = False,
-                                                     detector_backend = self.face_detector,
-                                                     align = True,
-                                                     expand_percentage = expand_percentage,
-                                                     normalization = self.normalization ):
+        try:
+            found_faces = self.engine(f.img,
+                                      enforce_detection = False,
+                                      detector_backend = self.face_detector,
+                                      align = True,
+                                      expand_percentage = expand_percentage)
+        except (ValueError,ZeroDivisionError) as e:
+            print(f"{f} DeepFace error {str(e)[0:100]}")
+            return
+        except (cv2.error) as e:
+            print(f"{f} DeepFace cv2.error {str(e)[0:100]}")
+            return
 
+        for found in found_faces:
+            # Ignore if face confidence is too low
+            if 'face_confidence' in found and found['face_confidence'] < self.MIN_FACE_CONFIDENCE:
+                continue
+
+            rect = {}
+            if 'facial_area' in found:
                 facial_area = found['facial_area']
-                f.add_tag(Tag(TAG_FACE,
-                              xy=(facial_area['x'],facial_area['y']),
-                              w=facial_area['w'],
-                              h=facial_area['h'],
-                              **found))
+                rect = {'xy':(facial_area['x'],facial_area['y']),
+                          'w':facial_area['w'],
+                          'h':facial_area['h']}
+
+            if 'region' in found:
+                region = found['region']
+                rect = {'xy':(region['x'],region['y']),
+                          'w':region['w'],
+                          'h':region['h']}
+
+            # ignore if face is too small
+            if (rect['w']<self.MIN_FACE_WIDTH) or (rect['h']<self.MIN_FACE_HEIGHT):
+                continue
+
+            # deepface sometimes creates embeddings with nan's.
+            # If we find them, remove them
+            if ('embedding' in found) and any_nan(found['embedding']):
+                del found['embedding']
+
+            f.add_tag(Tag(TAG_FACE, **{**found,**rect} ))
         self.output(f)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('image', type=str, help="image path")
+    parser = argparse.ArgumentParser(description="Test program for deepface. Run on a file or directory and dump the results.",
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--root', type=str, help="image path")
+    parser.add_argument('--verbose', action='store_true')
+    parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
-    p = SingleThreadedPipeline()
-    p.addLinearPipeline([ DeepFaceTag(detector_backend='yolov8'),
-                          ShowTags(wait=0),
-                          ExtractFacesToFrames(scale=1.3),
-                          ShowFrames(wait=0) ])
-    p.process_stream(  FrameStream(root=args.image))
+    with SingleThreadedPipeline(verbose=args.verbose, debug=args.debug) as p:
+        p.addLinearPipeline([ DeepFaceTagFaces(face_detector='yolov8'),
+                              ShowTags(wait=0),
+                              ExtractFacesToFrames(scale=1.3),
+                              ShowFrames(wait=0) ])
+        p.process_list(  FrameStream(root=args.root))

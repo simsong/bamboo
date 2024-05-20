@@ -2,6 +2,8 @@
 A number of stages that work with frames that are tagged with faces.
 """
 
+import logging
+
 from .frame import Frame,TAG_FACE,TAG_FACE_COUNT,Tag
 from .stage import Stage
 
@@ -18,6 +20,12 @@ def scale_from_center(*, xy, w, h, scale=1.0, make_ints=True):
         new_w = int(new_w)
         new_h = int(new_h)
         nxy = (int(nxy[0]), int(nxy[1]))
+    if nxy[0] < 0:
+        new_w += nxy[0]
+        nxy = (0, nxy[1])
+    if nxy[1] < 0:
+        new_h += nxy[1]
+        nxy = (nxy[0], 0)
     return (nxy, new_w, new_h)
 
 
@@ -26,9 +34,9 @@ class ExtractFacesToFrames(Stage):
     Consumes the input frames.
     """
     scale = 1.0
-    def __init__(self, scale=1.0):
+    def __init__(self, scale=1.0, verbose=False):
         """:param scale: allows a region larger than the recognized face to be selected."""
-        super().__init__()
+        super().__init__(verbose=verbose)
         self.scale = scale
 
     def process(self, f:Frame):
@@ -39,5 +47,7 @@ class ExtractFacesToFrames(Stage):
                 (xy, w, h) = scale_from_center( xy=t.xy, w=t.w, h=t.h, scale=self.scale)
 
                 f2 = f.crop( xy=xy, w=w, h=h)
+                assert f2.urn is None
                 f2.add_tag(t)   # add the tag! it has metadata
+                logging.debug("output %s",f2)
                 self.output( f2 )
