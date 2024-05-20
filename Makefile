@@ -87,6 +87,10 @@ install-ubuntu: $(REQ)
 	if [ -r requirements-ubuntu.txt ]; then $(PIP_INSTALL) -r requirements-ubuntu.txt ; else echo no requirements-ubuntu.txt ; fi
 	if [ -r requirements.txt ];        then $(PIP_INSTALL) -r requirements.txt ; else echo no requirements.txt ; fi
 
+# Includes ubuntu dependencies
+install-fedora: $(REQ)
+	make install-ubuntu
+
 # Includes MacOS dependencies managed through Brew
 install-macos:
 	brew update

@@ -143,3 +143,22 @@ Do we want to have an abstract pipeline object?
 * https://dl.acm.org/doi/10.1145/2733373.2806229
 * https://ieeexplore.ieee.org/document/7225141
 * https://ieeexplore.ieee.org/document/8438958
+
+To test the deepface tagger:
+python -m bamboo.face_deepface --debug --root <dir>
+===
+To optimize TensorFlow for my platform:
+git clone https://github.com/tensorflow/tensorflow.git
+./configure
+bazel build --config=opt //tensorflow/tools/pip_package:build_pip_package
+bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg
+pip install /tmp/tensorflow_pkg/tensorflow-<version>-<build_info>.whl
+===
+Notes on using Yolov8 with the Coral TPU:
+https://github.com/ultralytics/ultralytics/issues/4719
+https://docs.ultralytics.com/guides/coral-edge-tpu-on-raspberry-pi/
+https://ipcamtalk.com/threads/yolo-v8-issue-with-coral-tpu.74987/
+https://docs.ultralytics.com/integrations/edge-tpu/
+
+Dump the face confidence of every tag in a dir:
+jq '.tags[0].face_confidence' ~/tagdir/000/*.json

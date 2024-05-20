@@ -6,12 +6,14 @@ A simple pipeline to extract all of the faces from a set of photos, write them t
 import os
 import math
 import logging
-import subprocess
+from subprocess import call
+import platform
 
 from collections import defaultdict
 
-from sklearn.cluster import DBSCAN
-from sklearn.metrics.pairwise import cosine_distances
+from sklearn.cluster import DBSCAN,SpectralClustering
+from sklearn.metrics import silhouette_score, davies_bouldin_score
+from sklearn.metrics.pairwise import cosine_distances,cosine_similarity
 import numpy as np
 
 from lib.ctools import clogging
@@ -51,23 +53,25 @@ class CaptionFaces(Stage):
             f.add_tag( Tag(WriteFramesToHTMLGallery_tag, caption=caption))
         super().process(f)      # and continue processing
 
-def cluster_faces(*, rootdir, facedir, tagdir, show, out, epsilon,limit=None):
+def cluster_faces(*, rootdir, facedir, tagdir, show, out, epsilon,algorithm='dbscan',limit=None):
+    if algorithm not in ['dbscan','sc']:
+        raise RuntimeError("Clustering algorithm must be 'dbscan' or 'sc'.")
+
     os.makedirs(tagdir, exist_ok=True)
     os.makedirs(facedir, exist_ok=True)
 
     so = SourceOptions(limit=limit)
-    print("cf. so.limit=",so.limit)
 
     # Get all the tags and build a list of urns. We won't scan them a second time.
     seen_urns = set()
-    for f in FrameStream(tagdir,verbose=True):
+    for f in FrameStream(tagdir):
         seen_urns.add(f.src_urn)
     print(f"{len(seen_urns)} in {tagdir}")
 
     # If a rootdir was specified, analyze the images and write all of the frames that have
     # and embedding
     if rootdir:
-        with SingleThreadedPipeline() as p:
+        with SingleThreadedPipeline( verbose=True ) as p:
             p.addLinearPipeline([
                 # For each frame, tag all of the faces:
                 dt:= DeepFaceTagFaces(face_detector='yolov8', embeddings=True),
@@ -101,8 +105,7 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, out, epsilon,limit=None):
                     return False
                 return True
 
-            p.process_list( DissimilarFrameStream( rootdir, o=so, output_filter=not_seen ),
-                            verbose=True )
+            p.process_list( DissimilarFrameStream( rootdir, o=so, output_filter=not_seen ))
 
     # Now gather all of the paths and embeddings in order
     embeddings = []
@@ -129,8 +132,45 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, out, epsilon,limit=None):
     # DBSCAN parameters like eps and min_samples can be adjusted based on your
     # specific dataset and needs
     with timer.Timer("time to cluster"):
-        dbscan = DBSCAN(eps=epsilon, min_samples=2, metric='precomputed', n_jobs=-1)
-        clusters = dbscan.fit_predict(cosine_distances(X))
+
+        if algorithm=='dbscan':
+            dbscan = DBSCAN(eps=epsilon, min_samples=2, metric='precomputed', n_jobs=-1)
+            clusters = dbscan.fit_predict(cosine_distances(X))
+
+        if algorithm=='sc':
+            # First generate the affinity matrix
+            cosine_dist_matrix = cosine_distances(X)
+            sigma = 0.1
+            affinity_matrix = np.exp(-cosine_dist_matrix / (2 * sigma**2))
+            np.fill_diagonal(affinity_matrix, 0) # enforce zero diagonal
+
+            # symmetrize the affinity matrix
+            affinity_matrix = 0.5 * (affinity_matrix + affinity_matrix.T)
+
+            # Range of clusters to try
+            min_clusters = 20
+            max_clusters = 50
+
+            best_score = -1
+            best_n_clusters = -1
+
+            for n_clusters in range(min_clusters, max_clusters + 1):
+                print("n_clusters=",n_clusters)
+                sc = SpectralClustering(n_clusters=n_clusters, affinity='precomputed')
+                labels = sc.fit_predict(affinity_matrix)
+
+                # Evaluate clustering performance using silhouette score or Davies–Bouldin index
+                silhouette_avg = silhouette_score(affinity_matrix, labels)
+                # davies_bouldin_index = davies_bouldin_score(affinity_matrix, labels)
+
+                # Choose the number of clusters that maximizes the silhouette score
+                if silhouette_avg > best_score:
+                    best_score = silhouette_avg
+                    best_n_clusters = n_clusters
+                    clusters = labels
+
+            print("Best number of clusters:", best_n_clusters)
+            print("Best silhouette score:", best_score)
 
     maxcluster = max(clusters)
     print("cluster count:",maxcluster)
@@ -160,11 +200,20 @@ if __name__=="__main__":
     parser.add_argument("--limit", type=int)
     parser.add_argument("--epsilon", type=float, default=0.5, help="DBSCAN parameter")
     parser.add_argument("--out", help="output html file", default="cluster.html")
+    parser.add_argument("--algorithm", help="Specify algorithm to use. default is dbscan. other option is sc for SpectralClustering")
     clogging.add_argument(parser, loglevel_default='WARNING')
     args = parser.parse_args()
     clogging.setup(level=args.loglevel)
 
     if args.rootdir and not args.facedir:
         raise RuntimeError("--add requires --facedir")
-    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.tagdir, show=args.show, out=args.out, epsilon=args.epsilon,limit=args.limit)
-    subprocess.call(['open',args.out])
+    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.tagdir, show=args.show, out=args.out, epsilon=args.epsilon,algorithm=args.algorithm,limit=args.limit)
+
+
+    match platform.system():
+        case 'Linux':
+            call(['xdg-open',args.out])
+        case 'Darwin':
+            call(['open',args.out])
+        case 'Windows':
+            call(['start',args.out])

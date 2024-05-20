@@ -13,18 +13,25 @@ import pickle
 import logging
 import copy
 import urllib
+import functools
 from collections import defaultdict
 from abc import ABC,abstractmethod
 from filelock import FileLock
 
 from .frame import Frame,FrameTagDict
 
-DEFAULT_JPG_TEMPLATE="frame{counter:08}.jpg"
-DEFAULT_JSON_TEMPLATE="frame{counter:08}.json"
+DEFAULT_JPEG_TEMPLATE="{counter_div_1000:03}/frame{counter:08}.jpg"
+DEFAULT_JSON_TEMPLATE="{counter_div_1000:03}/frame{counter:08}.json"
 
 def validate_stage(stage):
     if not hasattr(stage,'count'):
         raise RuntimeError(str(stage) + "did not call super().__init__()")
+
+
+@functools.lru_cache(maxsize=128)
+def caching_mkdir(path):
+    os.makedirs(path, exist_ok=True)
+
 
 class Stage(ABC):
     """Abstract base class for processing DAG"""
@@ -97,7 +104,7 @@ class ShowFrames(Stage):
         if wait is not None:
             self.wait=wait
     def process(self, f:Frame):
-        title = self.title if self.title is not None else f.src
+        title = self.title if self.title is not None else f.urn
         f.show(title=title, wait=self.wait)
         self.output(f)
 
@@ -125,7 +132,7 @@ class FilterFrames(Stage):
 
 
 class SaveFramesToDirectory(Stage):
-    def __init__(self, root, *, template=DEFAULT_JPG_TEMPLATE, nonstop=False, **kwargs):
+    def __init__(self, root, *, template=DEFAULT_JPEG_TEMPLATE, nonstop=False, **kwargs):
         """Save the images to the directory, record the path where written, and move on.
         Format is determined by template.
         :param nonstop: - If True, do not stop for failed writer
@@ -140,7 +147,8 @@ class SaveFramesToDirectory(Stage):
     def process(self, f:Frame):
         f = f.copy()
         while True:
-            path = os.path.join(self.root, self.template.format(counter=self.counter))
+            path = os.path.join(self.root, self.template.format(counter_div_1000=self.counter//1000,
+                                                                counter=self.counter))
             if not os.path.exists(path):
                 break
             self.counter += 1
@@ -148,6 +156,7 @@ class SaveFramesToDirectory(Stage):
         # Save and increment counter
         try:
             self.counter += 1
+            caching_mkdir( os.path.dirname( path ))
             f.save(path)        # updates f.path
         except FileNotFoundError as e:
             if self.nonstop:
@@ -172,7 +181,8 @@ class WriteFrameObjectsToDirectory(Stage):
 
     def process(self, f:Frame):
         while True:
-            path = os.path.join(self.root, self.template.format(counter=self.counter))
+            path = os.path.join(self.root, self.template.format(counter_div_1000=self.counter//1000,
+                                                                counter=self.counter))
             if not os.path.exists(path):
                 break
             self.counter += 1
@@ -180,6 +190,7 @@ class WriteFrameObjectsToDirectory(Stage):
         # Save and increment counter
         try:
             self.counter += 1
+            caching_mkdir( os.path.dirname( path ))
             with open( path , "w") as fd:
                 fd.write(f.json)
 
@@ -201,6 +212,7 @@ class WriteFramesToHTMLGallery(Stage):
 <style>
 img.Image {
 max-width:128px;
+max-height: 128px;
 width:128px;
 }
 div.images {
