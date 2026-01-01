@@ -9,7 +9,7 @@ from bamboo.pipeline import SingleThreadedPipeline
 from bamboo.stage import ShowTags, SaveFramesToDirectory, ShowFrames
 from bamboo.face_yolo8 import Yolo8FaceTag
 from bamboo.face import ExtractFacesToFrames
-from bamboo.source import FrameStream,DissimilarFrameStream
+from bamboo.source import FrameStream,DissimilarFrameStream  # pylint: disable=unused-import
 
 if __name__=="__main__":
     import argparse

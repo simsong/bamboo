@@ -65,7 +65,10 @@ def hash_read(urn):
 def image_read(urn):
     """Caching image read. We cache to minimize what's stored in memory. We make it immutable to allow sharing"""
     assert urn is not None
+    data = bytes_read(urn)
+    logging.debug("calling cv2.imdecode. type(data)=%s len(data)=%s",type(data),len(data))
     img = cv2.imdecode(np.frombuffer( bytes_read(urn), np.uint8), cv2.IMREAD_ANYCOLOR)
+    logging.debug("img=%s",img)
     if img is None:
         raise RuntimeError(urn)
         raise NotImageError("cannot read:"+urn)
@@ -92,15 +95,19 @@ def similarity_for_two(t):
 P_URN = 'urn'
 P_CROP = 'crop'
 
+from typing import Union
 class Frame:
     """Abstraction to hold an image frame.
     If a stage modifies a Frame, it needs to make a copy first."""
     jpeg_quality = DEFAULT_JPEG_QUALITY
     FRAME_VERSION = 1
-    def __init__(self, *, img=None, src=None, mime_type=None, _w=None, _h=None, _depth=None, urn=None,history=None,tags=[]):
-        """src = the source frame from which this was copied"""
+    def __init__(self, *, img=None, src:Union['Frame',None]=None, mime_type=None, _w=None, _h=None, _depth=None, urn=None, history=None,tags=[]):
+        """
+        src = the source frame from which this was copied
+        urn = If read or written to a file, the urn to which it was read or written
+        """
         self.version = self.FRAME_VERSION
-        self.urn  = urn       # if read or written to a file, the urn to which it was read or written
+        self.urn  = urn
         if history is not None:
             self.history = history
         elif src is not None:

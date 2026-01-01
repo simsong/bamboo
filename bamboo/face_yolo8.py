@@ -192,7 +192,7 @@ class Yolo8FaceTag(Stage):
                                 iou_thres=NMS_THRESHOLD)
     fqa = FaceQualityAssessment(YOLO8N_QUALITY_ASSESSMENT)
 
-    def process(self, f:Frame):
+    def process_frame(self, f:Frame):
         # Detect Objects
         # we will be adding tags, so make a copy of this frame
         f = f.copy()
@@ -216,7 +216,7 @@ class Yolo8FaceQualityAssessemtn(Stage):
                                 iou_thres=NMS_THRESHOLD)
     fqa = FaceQualityAssessment(YOLO8N_QUALITY_ASSESSMENT)
 
-    def process(self, f:Frame):
+    def process_frame(self, f:Frame):
         # Detect Objects
         # we will be adding tags, so make a copy of this frame
         f = f.copy()

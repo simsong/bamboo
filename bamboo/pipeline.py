@@ -46,7 +46,7 @@ class Pipeline(ABC):
             stages[i+1].pipeline = self
             Connect( stages[i], stages[i+1] )
 
-    def process(self, f):
+    def process_frame(self, f):
         """Run a frame through the pipeline."""
         if not self.running:
             raise RuntimeError("pipeline not running")
@@ -56,17 +56,17 @@ class Pipeline(ABC):
         self.run_queue()
 
     def process_list(self, flist, verbose=None):
-        logger.info("== process_list ==")
+        logger.info("== process_list(%s) ==",flist)
         old_verbose = self.verbose
         if verbose is not None:
             self.verbose = verbose
         for f in flist:
-            self.process(f)
+            self.process_frame(f)
         self.verbose = old_verbose
 
     def process_stream(self, fstream):
         for f in fstream:
-            self.process(f)
+            self.process_frame(f)
 
     def print_stats(self, out=sys.stdout):
         for stage in self.stages:

@@ -111,7 +111,7 @@ class IngestCamera():
 
         # Loop through all possible roots
         for r in yaml_items(self.root):
-            new_name = r + '/' + filename_template(camera=self.camera, path=i.path)
+            new_name = r + '/' + filename_template(camera=self.camera, urn=i.path)
             self.total_kept += 1
             self.notice(f"{i.path} → {new_name}", endl=True)
             o = urllib.parse.urlparse(new_name)

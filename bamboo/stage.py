@@ -50,7 +50,7 @@ class Stage(ABC):
         self.verbose = verbose
         self.registered_stages.append(self)
 
-    def process(self, f:Frame):
+    def process_frame(self, f:Frame):
         """Called to process. Default behavior is to copy frame to output."""
         self.output(f)
 
@@ -60,7 +60,7 @@ class Stage(ABC):
         Processes and then passes the frame to the output stages."""
         t0 = time.time()
         if (self.input_filter is None) or self.input_filter(f):
-            self.process(f)
+            self.process_frame(f)
         t = time.time() - t0
         self.sum_t  += t
         self.sum_t2 += (t*t)
@@ -103,7 +103,7 @@ class ShowFrames(Stage):
         self.title = title
         if wait is not None:
             self.wait=wait
-    def process(self, f:Frame):
+    def process_frame(self, f:Frame):
         title = self.title if self.title is not None else f.urn
         f.show(title=title, wait=self.wait)
         self.output(f)
@@ -116,7 +116,7 @@ class ShowTags(Stage):
         super().__init__(**kwargs)
         if wait is not None:
             self.wait=wait
-    def process(self, f:Frame):
+    def process_frame(self, f:Frame):
         if len(f.tags):
             f.show_tags(title="tagged image", wait=self.wait)
         self.output(f)
@@ -144,7 +144,7 @@ class SaveFramesToDirectory(Stage):
         self.template = template
         self.nonstop  = nonstop
 
-    def process(self, f:Frame):
+    def process_frame(self, f:Frame):
         f = f.copy()
         while True:
             path = os.path.join(self.root, self.template.format(counter_div_1000=self.counter//1000,
@@ -179,7 +179,7 @@ class WriteFrameObjectsToDirectory(Stage):
         self.template = template
         self.nonstop  = nonstop
 
-    def process(self, f:Frame):
+    def process_frame(self, f:Frame):
         while True:
             path = os.path.join(self.root, self.template.format(counter_div_1000=self.counter//1000,
                                                                 counter=self.counter))
@@ -242,7 +242,7 @@ div.images {
         self.image_height = image_height
         self.frames_by_key = defaultdict(list)
 
-    def process(self, f):
+    def process_frame(self, f):
         self.frames_by_key[f.gallery_key].append(f)
 
     def pipeline_shutdown(self):

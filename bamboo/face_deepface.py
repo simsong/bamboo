@@ -117,7 +117,7 @@ class DeepFaceTagFaces(Stage):
         self.normalization = normalization
         self.scale       = scale
 
-    def process(self, f:Frame):
+    def process_frame(self, f:Frame):
         # Detect Objects
         f = f.copy()            # we will be adding tags
         expand_percentage = (self.scale - 1.0) * 100

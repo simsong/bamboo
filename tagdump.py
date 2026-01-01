@@ -2,7 +2,7 @@
 Dump the contents of a file as pickles
 """
 
-import pickle
+#import pickle
 import json
 
 def dump_keys(obj, indent, verbose):

@@ -1,6 +1,6 @@
 - If two photos come from the same image, they can't be the same person.
 - If two photos come from adjacent images and the person hasn't moved much, that makes them likely the same person.
-
+- Stop faces
 - Stages can be generators. Should the be? Our sources.
 
 

@@ -40,7 +40,7 @@ class RekognitionFaceDetect(Stage):
     region_name=DEFAULT_REGION
     profile_name=DEFAULT_PROFILE
 
-    def process(self, f:Frame):
+    def process_frame(self, f:Frame):
         # we will be adding tags, so make a copy of this frame.
         try:
             faceDetails = get_info(f)

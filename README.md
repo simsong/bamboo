@@ -1,3 +1,33 @@
+New theory of operation:
+- Teach frame - different from previous frame?
+- Face - move or different?
+- Extract faces immediately
+- pointers to original frame
+- combine faces
+
+
+
+# TTD
+- [ ] Job #1 - Runs when movie is loaded to S3. SPlit movie into frames, put each frame in S3 at a different prefix.
+- [ ] Job #2 - Run face detection @ high res so that each photo in pipeline is at the highest possible res. So cannot store photos in SQS messages, need to store them in Se.
+   Then move into frames, each frame written to S3.
+- [ ] Job #3 - For each face - turns to vectors and does stuff.
+
+Q - How does JPEG apply color profile?
+Q - Store all my phones and fix them all?
+
+Find similar photos:
+- [ ] All photos to vectors - 3x3 w/ historgrams for each color?
+- [ ] DBScan?  Rate all 4 ways?
+- [ ] Open source vector dfatabase?
+- [ ] Alternative to dbscan - find similar pairs within a thresthold?
+     - Find dups
+     - Fix rotations
+     - Run on iCloud or Google
+     - Use LLM to fix filenames? Local LLM?
+
+
+
 # Bamboo
 Bamboo is a python framework that makes it easy to build performant, production-quality research pipelines for processing video and stillframe images.
 

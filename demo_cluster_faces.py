@@ -4,16 +4,15 @@ A simple pipeline to extract all of the faces from a set of photos, write them t
 """
 
 import os
-import math
 import logging
 from subprocess import call
 import platform
 
-from collections import defaultdict
+
 
 from sklearn.cluster import DBSCAN,SpectralClustering
-from sklearn.metrics import silhouette_score, davies_bouldin_score
-from sklearn.metrics.pairwise import cosine_distances,cosine_similarity
+from sklearn.metrics import silhouette_score, davies_bouldin_score            # pylint: disable=unused-import
+from sklearn.metrics.pairwise import cosine_distances,cosine_similarity       # pylint: disable=unused-import
 import numpy as np
 
 from lib.ctools import clogging
@@ -22,7 +21,7 @@ from lib.ctools import timer
 from bamboo.stage  import Stage,SaveFramesToDirectory,ShowTags,Connect,WriteFrameObjectsToDirectory,FilterFrames,WriteFramesToHTMLGallery,WriteFramesToHTMLGallery_tag
 from bamboo.face_deepface import DeepFaceTagFaces
 from bamboo.face   import ExtractFacesToFrames
-from bamboo.source import DissimilarFrameStream,TagsFromDirectory,FrameStream,SourceOptions
+from bamboo.source import DissimilarFrameStream,TagsFromDirectory,FrameStream,SourceOptions  # pylint: disable=unused-import
 from bamboo.frame  import Frame,Tag,TAG_FACE
 from bamboo.pipeline import SingleThreadedPipeline
 
@@ -44,6 +43,7 @@ def caption_from_tag(tag):
     return caption
 
 class CaptionFaces(Stage):
+    """Stage that adds a caption to each face."""
     def process(self, f:Frame):
         caption = ''
         for tag in f.findall_tags(TAG_FACE):
@@ -51,8 +51,28 @@ class CaptionFaces(Stage):
 
         if caption:
             f.add_tag( Tag(WriteFramesToHTMLGallery_tag, caption=caption))
-        super().process(f)      # and continue processing
+        super().process_frame(f)      # and continue processing
 
+class NotSeen(Stage):
+    """Filter that does not let through URNs that have been seen """
+    @classmethod
+    def set_seen(cls, s):
+        cls.seen_urns = s
+
+    @classmethod
+    def seen_filter(cls, f):
+        if f.urn in cls.seen_urns:
+            return False
+        return True
+
+    def __init__(self, seen_urns, *args, **kwargs):
+        self.set_seen(seen_urns)
+        super().__init__(*args, **kwargs, output_filter=NotSeen.seen_filter)
+
+
+
+# pylint: disable=too-many-arguments
+# pylint: disable=too-many-statements
 def cluster_faces(*, rootdir, facedir, tagdir, show, out, epsilon,algorithm='dbscan',limit=None):
     if algorithm not in ['dbscan','sc']:
         raise RuntimeError("Clustering algorithm must be 'dbscan' or 'sc'.")
@@ -73,6 +93,9 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, out, epsilon,algorithm='dbs
     if rootdir:
         with SingleThreadedPipeline( verbose=True ) as p:
             p.addLinearPipeline([
+                # Skip URNs that we've seen
+                NotSeen(seen_urns),
+
                 # For each frame, tag all of the faces:
                 dt:= DeepFaceTagFaces(face_detector='yolov8', embeddings=True),
 
@@ -100,12 +123,7 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, out, epsilon,algorithm='dbs
             if show:
                 Connect(dt, ShowTags(wait=200))
 
-            def not_seen(f):
-                if f.urn in seen_urns:
-                    return False
-                return True
-
-            p.process_list( DissimilarFrameStream( rootdir, o=so, output_filter=not_seen ))
+            p.process_list( FrameStream( rootdir, o=so ))
 
     # Now gather all of the paths and embeddings in order
     embeddings = []
@@ -182,7 +200,7 @@ def cluster_faces(*, rootdir, facedir, tagdir, show, out, epsilon,algorithm='dbs
         for (cluster,f) in zip(clusters,face_frames):
             logging.debug("cluster %s frame %s",cluster,f)
             f.gallery_key = cluster
-            p.process(f)
+            p.process_frame(f)
 
 
 
@@ -207,8 +225,8 @@ if __name__=="__main__":
 
     if args.rootdir and not args.facedir:
         raise RuntimeError("--add requires --facedir")
-    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.tagdir, show=args.show, out=args.out, epsilon=args.epsilon,algorithm=args.algorithm,limit=args.limit)
-
+    cluster_faces(rootdir=args.rootdir, facedir=args.facedir, tagdir=args.tagdir,
+                  show=args.show, out=args.out, epsilon=args.epsilon,algorithm=args.algorithm,limit=args.limit)
 
     match platform.system():
         case 'Linux':

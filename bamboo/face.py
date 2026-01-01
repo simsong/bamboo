@@ -39,7 +39,7 @@ class ExtractFacesToFrames(Stage):
         super().__init__(verbose=verbose)
         self.scale = scale
 
-    def process(self, f:Frame):
+    def process_frame(self, f:Frame):
         for t in f.tags:
             if t.tag_type==TAG_FACE:
                 # Find the existing center, width and height
