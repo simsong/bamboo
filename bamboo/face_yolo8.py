@@ -14,7 +14,7 @@ from os.path import join,dirname,abspath
 
 from .stage import Stage,ShowTags,ShowFrames
 from .face import ExtractFacesToFrames
-from .frame import Frame,Tag,TAG_FACE
+from .frame import Frame,Tag,TAG_FACE,Patch
 from .pipeline import SingleThreadedPipeline
 from .source import FrameStream
 
@@ -192,7 +192,7 @@ class Yolo8FaceTag(Stage):
                                 iou_thres=NMS_THRESHOLD)
     fqa = FaceQualityAssessment(YOLO8N_QUALITY_ASSESSMENT)
 
-    def process(self, f:Frame):
+    def process_frame(self, f:Frame):
         # Detect Objects
         # we will be adding tags, so make a copy of this frame
         f = f.copy()
@@ -211,14 +211,12 @@ class Yolo8FaceTag(Stage):
 
 class Yolo8FaceQualityAssessemtn(Stage):
     """Just apply the FaceQualityAssessment to the face tags on the frame."""
-    TODO
-
     face_detector = YOLOv8_face(YOLO8N_FACE_PATH,
                                 conf_thres=CONF_THRESHOLD,
                                 iou_thres=NMS_THRESHOLD)
     fqa = FaceQualityAssessment(YOLO8N_QUALITY_ASSESSMENT)
 
-    def process(self, f:Frame):
+    def process_frame(self, f:Frame):
         # Detect Objects
         # we will be adding tags, so make a copy of this frame
         f = f.copy()

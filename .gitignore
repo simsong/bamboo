@@ -179,3 +179,7 @@ hosts
 *.html
 *tags/
 *dir/
+*.json
+*.cut
+*.ini
+**/*.ini

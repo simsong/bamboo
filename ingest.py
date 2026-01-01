@@ -2,8 +2,10 @@
 """
 Find new photos test program.
 Finds them and archives photos significantly different from previous ones with a window.os +/-
+TODO - rewrite with bamboo framework
 
 """
+
 
 import os
 import os.path
@@ -42,15 +44,15 @@ def yaml_items(item):
         item = [item]
     yield from item
 
-def filename_template(*,camera,path=None,mtime=None):
-    """Returns the path"""
-    if path and not mtime:
-        mtime = datetime.fromtimestamp( os.stat(path).st_mtime )
+def filename_template(*,camera,urn=None,mtime=None):
+    """Returns the urn"""
+    if urn and not mtime:
+        mtime = datetime.fromtimestamp( os.stat(urn).st_mtime )
 
     fmt =  f"{camera}/{mtime.year:04}-{mtime.month:02}/{mtime.year:04}{mtime.month:02}{mtime.day:02}-{mtime.hour:02}{mtime.minute:02}{mtime.second:02}"
     if mtime.microsecond>0:
         fmt += f"{mtime.microsecond:06}"
-    fmt += os.path.splitext(path)[1]
+    fmt += os.path.splitext(urn)[1]
     return fmt
 
 
@@ -109,7 +111,7 @@ class IngestCamera():
 
         # Loop through all possible roots
         for r in yaml_items(self.root):
-            new_name = r + '/' + filename_template(camera=self.camera, path=i.path)
+            new_name = r + '/' + filename_template(camera=self.camera, urn=i.path)
             self.total_kept += 1
             self.notice(f"{i.path} → {new_name}", endl=True)
             o = urllib.parse.urlparse(new_name)

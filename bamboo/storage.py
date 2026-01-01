@@ -8,10 +8,12 @@ import os
 import mimetypes
 import boto3
 import functools
+import logging
+from os.path import dirname
 
 @functools.lru_cache(maxsize=4)
 def mkdirs(path):
-    print("mkdirs",path)
+    logging.debug("mkdirs %s",path)
     os.makedirs(path, exist_ok = True)
 
 @functools.lru_cache(maxsize=4)
@@ -19,9 +21,10 @@ def s3_client():
     return boto3.session.Session().client( S3 )
 
 def bamboo_save(url, data, mimetype=None):
-    o = urllib.parse.urlparse(new_name)
+    o = urllib.parse.urlparse(url)
+    logging.debug("url=%s o=%s data=%s",url,o,data)
     if o.scheme=='file' or o.scheme=='':
-        mkdirs( dirname(o.path) )
+        mkdirs( dirname(o.path))
         with open(o.path,'wb') as f:
             f.write(data)
     elif o.scheme == 's3':

@@ -1,5 +1,35 @@
+New theory of operation:
+- Teach frame - different from previous frame?
+- Face - move or different?
+- Extract faces immediately
+- pointers to original frame
+- combine faces
+
+
+
+# TTD
+- [ ] Job #1 - Runs when movie is loaded to S3. SPlit movie into frames, put each frame in S3 at a different prefix.
+- [ ] Job #2 - Run face detection @ high res so that each photo in pipeline is at the highest possible res. So cannot store photos in SQS messages, need to store them in Se.
+   Then move into frames, each frame written to S3.
+- [ ] Job #3 - For each face - turns to vectors and does stuff.
+
+Q - How does JPEG apply color profile?
+Q - Store all my phones and fix them all?
+
+Find similar photos:
+- [ ] All photos to vectors - 3x3 w/ historgrams for each color?
+- [ ] DBScan?  Rate all 4 ways?
+- [ ] Open source vector dfatabase?
+- [ ] Alternative to dbscan - find similar pairs within a thresthold?
+     - Find dups
+     - Fix rotations
+     - Run on iCloud or Google
+     - Use LLM to fix filenames? Local LLM?
+
+
+
 # Bamboo
-Bamboo is a python module for building production-quality research pipelines for processing video and stillframe images.
+Bamboo is a python framework that makes it easy to build performant, production-quality research pipelines for processing video and stillframe images.
 
 ## Features
 
@@ -139,3 +169,26 @@ Do we want to have an abstract pipeline object?
 
 # See Also
 * https://universe.roboflow.com/ - "The world's largest collection of open source computer vision datasets and APIs." (Unfortunately, no consistent API).
+* https://dl.acm.org/doi/10.1145/2393347.2393394
+* https://dl.acm.org/doi/10.1145/2733373.2806229
+* https://ieeexplore.ieee.org/document/7225141
+* https://ieeexplore.ieee.org/document/8438958
+
+To test the deepface tagger:
+python -m bamboo.face_deepface --debug --root <dir>
+===
+To optimize TensorFlow for my platform:
+git clone https://github.com/tensorflow/tensorflow.git
+./configure
+bazel build --config=opt //tensorflow/tools/pip_package:build_pip_package
+bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg
+pip install /tmp/tensorflow_pkg/tensorflow-<version>-<build_info>.whl
+===
+Notes on using Yolov8 with the Coral TPU:
+https://github.com/ultralytics/ultralytics/issues/4719
+https://docs.ultralytics.com/guides/coral-edge-tpu-on-raspberry-pi/
+https://ipcamtalk.com/threads/yolo-v8-issue-with-coral-tpu.74987/
+https://docs.ultralytics.com/integrations/edge-tpu/
+
+Dump the face confidence of every tag in a dir:
+jq '.tags[0].face_confidence' ~/tagdir/000/*.json

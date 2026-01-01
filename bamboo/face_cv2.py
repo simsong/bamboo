@@ -22,7 +22,7 @@ class OpenCVFaceDetector(Stage):
     frontal_face_cascade = cv2.CascadeClassifier( cv2_cascade('haarcascade_frontalface_default.xml'))
     profile_cascade = cv2.CascadeClassifier( cv2_cascade('haarcascade_profileface.xml'))
 
-    def process(self, f:Frame):
+    def process_frame(self, f:Frame):
         # we will be adding tags, so make a copy of the frame.
         # We then output the tagged frame.
         f = f.copy()
@@ -55,7 +55,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     p = SingleThreadedPipeline()
-    p.addLinearPipeline([ Yolo8FaceDetect(), ShowTags(wait=0), ExtractFaces(scale=1.3), ShowFrames(wait=0) ])
-    f = Frame(path=args.image)
-    p.process(f)
+    p.addLinearPipeline([ Yolo8FaceDetect(),
+                          ShowTags(wait=0),
+                          ExtractFaces(scale=1.3),
+                          ShowFrames(wait=0) ])
+    f = Frame(urn=args.image)
+    p.process_frame(f)
     print(f.tags)
